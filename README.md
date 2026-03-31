@@ -1,8 +1,9 @@
+[![Build](https://github.com/fprotais/Mesh_optimization/actions/workflows/continuous.yml/badge.svg?event=push)](https://github.com/fprotais/Mesh_optimization/actions/workflows/continuous.yml)
 # Versatile Volume Fitting with Automatic Feature Preservation
 
 This is the reference implementation of the optimization approach presented in
 
-Versatile Volume Fitting with Automatic Feature Preservation (link to come)
+Versatile Volume Fitting with Automatic Feature Preservation (link to come) <br />
 [F. Protais](https://fprotais.github.io/), [G. Cherchi](https://www.gianmarcocherchi.com), [M. Livesu](http://pers.ge.imati.cnr.it/livesu/)
 
 > ⚠️ This code is intended to be included in [CGAL](https://github.com/cgal/cgal) in the near future. As such, it may undergo noticeable changes in its structure. This repository will always remain as a link to the CGAL version, and hopefully provide python bindings.
