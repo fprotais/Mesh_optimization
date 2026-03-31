@@ -1,4 +1,3 @@
-[![Build](https://github.com/fprotais/Mesh_optimization/actions/workflows/continuous.yml/badge.svg?event=push)](https://github.com/fprotais/Mesh_optimization/actions/workflows/continuous.yml)
 # Versatile Volume Fitting with Automatic Feature Preservation
 
 This is the reference implementation of the optimization approach presented in
