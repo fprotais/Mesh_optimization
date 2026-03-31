@@ -120,3 +120,8 @@ Meshes can be visualized using various tools depending on their format. [Graphit
 # License
 
 This code is under AGPL and shall not be distributed in or with closed source software. For commercial uses, alternative licensing will be provided after inclusion into the CGAL library.
+
+# Citing this repo
+
+Soon to come. 
+
