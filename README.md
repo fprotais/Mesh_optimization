@@ -2,7 +2,7 @@
 
 This is the reference implementation of the optimization approach presented in
 
-Versatile Volume Fitting with Automatic Feature Preservation (link to come) <br />
+[Versatile Volume Fitting with Automatic Feature Preservation](https://inria.hal.science/hal-05574616v1) <br />
 [F. Protais](https://fprotais.github.io/), [G. Cherchi](https://www.gianmarcocherchi.com), [M. Livesu](http://pers.ge.imati.cnr.it/livesu/)
 
 > ⚠️ This code is intended to be included in [CGAL](https://github.com/cgal/cgal) in the near future. As such, it may undergo noticeable changes in its structure. This repository will always remain as a link to the CGAL version, and hopefully provide python bindings.
@@ -122,5 +122,19 @@ This code is under AGPL and shall not be distributed in or with closed source so
 
 # Citing this repo
 
-Soon to come. 
+This project is currently described in the eponymous working paper. The status of the paper is subject to future change. If you use our code in your academic projects, please cite the following BibTeX entry:
 
+```
+@unpublished{protais:hal-05574616,
+  TITLE = {{Versatile Volume Fitting with Automatic Feature Preservation}},
+  AUTHOR = {Protais, Fran{\c c}ois and Cherchi, Gianmarco and Livesu, Marco},
+  URL = {https://inria.hal.science/hal-05574616},
+  NOTE = {working paper},
+  YEAR = {2026},
+  MONTH = Mar,
+  KEYWORDS = {tetrahedral mesh ; hexahedral mesh ; fitting ; sharp features ; projection ; smoothing ; untangling},
+  PDF = {https://inria.hal.science/hal-05574616v1/file/Smoothing__Unica_INRIA_techreport.pdf},
+  HAL_ID = {hal-05574616},
+  HAL_VERSION = {v1},
+}
+```
