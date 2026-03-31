@@ -1,4 +1,0 @@
-[submodule "cgal"]
-	path = cgal
-	url = https://github.com/fprotais/cgal.git
-	branch = Mesh_optimization-boundary-fprotais
