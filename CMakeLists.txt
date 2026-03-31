@@ -23,6 +23,7 @@ find_package(Eigen3 3.3.0 QUIET REQUIRED)
 
 find_package(OpenMP COMPONENTS CXX)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 nanobind_add_module(cgal_mesh_optimization src/cgal_mesh_optimization_interface.cpp)
 
