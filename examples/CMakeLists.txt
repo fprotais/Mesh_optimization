@@ -1,0 +1,11 @@
+add_subdirectory(Cinolib)
+add_subdirectory(libigl)
+add_subdirectory(geogram)
+
+option(BUILD_CGAL "Make example with CGAL" ON)
+if (BUILD_CGAL)
+    find_package(CGAL REQUIRED)
+    add_subdirectory(CGAL)
+else()
+    message(WARNING "CGAL is disabled, cgal_offset_computation will not be available.")
+endif()
