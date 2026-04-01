@@ -25,7 +25,7 @@ In this case it will operate as a smoothing (or untangling algorithm), improving
 In both cases, the result will be saved as `output.mesh`. The executable `cinolib_smooth` operates in the exact same way and only differentiates from `geogram_smooth` because it uses a different frontend for mesh handling.
 
 # Handle based deformation
-<img src="/assets/images/bunny.jpg" alt="Bunny handles" width="600"/>
+<img src="/assets/images/bunny.jpg" alt="Bunny handles" width="1200"/>
 
 
 This executable will perform a deformation of the input object to match a set of input constraints, as shown in Fig. 12.
@@ -55,7 +55,7 @@ The parameters to run the different examples are as follows:
 ./bin/cgal_offset_computation ../data/stairs.off 60 600
 ./bin/cgal_offset_computation ../data/stairs.off 80 600
 ```
-<img src="/assets/images/stairs.jpg" alt="Stairs" width="600"/>
+<img src="/assets/images/stairs.jpg" alt="Stairs" width="1200"/>
 
 * Fig 15:
 ```Bash
@@ -64,7 +64,7 @@ The parameters to run the different examples are as follows:
 ./bin/cgal_offset_computation ../data/43149.off 150 20  #  5% offset
 ./bin/cgal_offset_computation ../data/43149.off 150 10  # 10% offset
 ```
-<img src="/assets/images/various_offsets.jpg" alt="Offset" width="600"/>
+<img src="/assets/images/various_offsets.jpg" alt="Offset" width="1200"/>
 
 The main bottleneck of the code is the inside remeshing that we perform with CGAL after the Alpha-wrapper.
 

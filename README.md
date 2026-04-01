@@ -64,7 +64,7 @@ The same executable can also be called with a unique input parameter, as:
 ```
 In this case it will operate as a smoothing (or untangling algorithm), improving the mesh quality while trying to preserve the outer boundary.
 
-![Fitting image](/assets/images/hexmesh.jpg)
+<img src="/assets/images/hexmesh.jpg" alt="hexmesh" width="800"/>
 
 In both cases, the result will be saved as `output.mesh`. 
 
