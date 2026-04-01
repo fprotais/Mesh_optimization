@@ -1,4 +1,5 @@
 # Versatile Volume Fitting with Automatic Feature Preservation
+<img src="/assets/images/teaser.jpg" alt="teaser" width="1200"/>
 
 This is the reference implementation of the optimization approach presented in
 
