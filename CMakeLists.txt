@@ -31,3 +31,7 @@ include(FetchContent)
 
 add_subdirectory(examples)
 
+option(BUILD_SANDBOX "Build sandbox" OFF)
+if (BUILD_SANDBOX)
+    add_subdirectory(sandbox)
+endif()
