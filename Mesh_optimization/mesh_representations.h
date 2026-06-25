@@ -60,6 +60,8 @@ namespace default_structures {
 }
 
 namespace utils {
+
+    // Allows iterating over a range of unsigned integers with a simple syntax (for (unsigned i : Contiguous_unsigned_range{0, n}) { ... })
     struct Contiguous_unsigned_range {
         std::size_t i, n;
         void operator++() { ++i; }
@@ -240,6 +242,92 @@ namespace helper_structures {
         std::vector<std::vector<Vertex_descriptor>> _face_vertices;
         std::vector<unsigned> _id;
     };
+
+}
+
+
+// WORK IN PROGRESS
+namespace cgal_types {
+template <typename Triangulation_3>
+class Triangulation_3_wrapper {
+    using Cell_descriptor = Triangulation_3::Cell_handle;
+    using Vertex_descriptor = Triangulation_3::Vertex_handle;
+    using Point_3 = Triangulation_3::Geom_traits::Point_3;
+
+    std::size_t nb_cells() const { return tr.number_of_finite_cells(); }
+    std::size_t nb_vertices() const { return tr.number_of_vertices(); }
+
+    Point_3 vertex_coordinates(Vertex_descriptor vertex) const { return tr.point(vertex); }
+    void set_new_vertex_coordinates(Vertex_descriptor vertex, Point_3 coord) {
+        vertex->set_point(coord);
+    }  
+
+    auto cell_range() const { return tr.finite_cell_handles(); } 
+    std::array<Vertex_descriptor, 4> cell_vertices(Cell_descriptor cell) const { 
+        std::array<Vertex_descriptor, 4> vertices;
+        for (int i = 0; i < 4; ++i) {
+            vertices[static_cast<unsigned>(i)] = cell->vertex(i);
+        }
+        return vertices;
+    }
+    std::array<Point_3, 4> cell_reference_shape(Cell_descriptor cell) const {
+        return Shapes::VTK_TETRAHEDRON<Point_3>();
+    }
+
+    Triangulation_3 &tr;
+};
+
+template <typename Triangulation_3>
+class Surface_mesh_placeholder {
+
+};
+
+// template <typename SurfaceMesh>
+// class Surface_mesh_wrapper {
+//     using Face_descriptor = std::size_t;
+//     using Normal_3 = Eigen::Vector3d;
+//     std::size_t nb_faces() const { return 0; }
+//     std::vector<Face_descriptor> face_range() const { return {}; }
+//     std::size_t nb_face_vertices(Face_descriptor face) const { return 0; }
+//     unsigned surface_id(Face_descriptor) const { return 0; }
+//     std::vector<Vertex_descriptor> face_vertices(Face_descriptor face) const { return {}; }
+    
+//     SurfaceMesh const &sm;
+// };
+
+template <typename C3T3>
+class C3T3_wrapper {
+    using Cell_descriptor = std::size_t;
+    using Vertex_descriptor = std::size_t;
+    using Face_descriptor = std::size_t;
+    using Edge_descriptor = std::size_t;
+    using Normal_3 = Eigen::Vector3d;
+    using Point_3 = Eigen::Vector3d;
+
+    std::size_t nb_cells() const { return 0; }
+    std::size_t nb_edges() const { return 0; }
+    std::size_t nb_faces() const { return 0; }
+    std::size_t nb_vertices() const { return 0; }
+
+    Point_3 vertex_coordinates(Vertex_descriptor vertex) const { return {0.,0.,0.}; }
+    void set_new_vertex_coordinates(Vertex_descriptor vertex, Point_3 coord) {} 
+    std::vector<Cell_descriptor> cell_range() const { return {}; } 
+    std::array<Vertex_descriptor, 4> cell_vertices(Cell_descriptor cell) const { return {0,0,0,0}; } 
+    std::array<Point_3, 4> cell_reference_shape(Cell_descriptor cell) const {
+        return Shapes::VTK_TETRAHEDRON<Point_3>();
+    }
+
+    std::vector<Face_descriptor> face_range() const { return {}; }
+    std::size_t nb_face_vertices(Face_descriptor face) const { return 0; }
+    unsigned surface_id(Face_descriptor) const { return 0; }
+    std::vector<Vertex_descriptor> face_vertices(Face_descriptor face) const { return {}; }
+
+    std::vector<Edge_descriptor> edge_range() const { return {}; }
+    unsigned curve_id(Edge_descriptor) const { return 0; }
+    Vertex_descriptor edge_vertex(Edge_descriptor edge, unsigned i) const { return Vertex_descriptor(); }
+
+    C3T3 &c3t3;
+};
 
 }
 

@@ -133,11 +133,11 @@ int main(int argc, char** argv) {
     }
 
     std::vector<GEO::index_t> projection_facet(mesh.facets.nb(), GEO::NO_FACET);
-    auto query = [&](GEO::vec3 const &coord, unsigned surface_id, double radius) -> std::tuple<GEO::vec3, GEO::vec3> {
+    auto query = [&](GEO::vec3 const &coord, unsigned surface_id, double radius) -> std::tuple<GEO::vec3, GEO::vec3, double> {
         GEO::vec3 res;
         double sqr_dist;
         GEO::index_t facet = aabb.nearest_facet(coord, res, sqr_dist);
-        return {res, normal[facet]};
+        return {res, normal[facet], 1.};
     };
 
     GEO::mesh_save(mesh, "input.mesh");
@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
 
     optimizer.set_verbose();
     optimizer.set_max_number_of_iteration(100);
-    optimizer.untangle();
+    optimizer.run();
 
     GEO::mesh_save(mesh, "output.mesh");
 

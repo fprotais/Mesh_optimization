@@ -69,6 +69,15 @@ In this case it will operate as a smoothing (or untangling algorithm), improving
 
 In both cases, the result will be saved as `output.mesh`. 
 
+## Exact predicates
+
+The code can include exact predicates to strictly enforce the orientation of elements. This is disabled by default to support starting from invalid meshes. 
+It can simply be enabled using the following instruction: 
+```C++
+optimizer.set_predicates_mode(Mesh_optimization::Parameters::STRONG_ENFORCEMENT); 
+```
+
+
 ## Element orientations
 
 Element orientation is key to optimize mesh quality (and guarantee validity). Not all available models and tools stick to the same convention, sometimes generating unexplainable failures in the software. We stick to the VTK convention for all mixed elements (see Figure 2 [here](https://docs.vtk.org/en/latest/vtk_file_formats/vtk_legacy_file_format.html)).

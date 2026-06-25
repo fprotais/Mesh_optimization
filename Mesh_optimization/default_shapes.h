@@ -6,7 +6,7 @@
 
 namespace Mesh_optimization {
 namespace Shapes {
-    template <
+    template < 
         typename Point3  = Eigen::Vector3d
     >
     class Base_element_shape_reference {
@@ -31,7 +31,7 @@ namespace Shapes {
         bool inverse = false;
     };
 
-    // This heavy class set-up is to obtain something generic that does not store data while still working with Eigen that does not allow constexpr allocations
+    // This heavy class set-up is to obtain something generic that does not store data while still working with Eigen that does not allow constexpr allocations 
     template <
         typename Point3  = Eigen::Vector3d,
         unsigned NbVertices = 0,
@@ -67,7 +67,7 @@ namespace Shapes {
         }
         operator std::array<Point3, 4> () const { return this->inner_tetrahedra_reference_shape(0);  }
     };
-
+    
     template <typename Point3> const std::array<Point3, 4> VTK_TETRAHEDRON<Point3>::reference_points = {{
         Point3{std::sqrt(8./9),0,-1./3},
         Point3{-std::sqrt(2./9),std::sqrt(2./3),-1./3},

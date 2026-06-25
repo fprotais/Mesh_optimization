@@ -6,8 +6,45 @@
 #include "mesh_representations.h"
 #include "internal/Tetrahedral_conformal_optimizer.h"
 
+
 namespace Mesh_optimization {
 
+namespace Parameters {
+    /*!
+        Recommended parameters for boundary weights: 
+        DEFAULT: 1, for standard mesh smoothing
+        STRONG: 10, when surface deviation should be avoided
+        SOFT: 1e-3, when only slight influence of the boundary is required
+    */
+    enum BOUNDARY_WEIGHTING_MODE {DEFAULT, STRONG, SOFT};
+
+    enum OPTIMIZATION_MODE { CONFORMAL, MIXED_WITH_SIZE, LAPLACIAN, MIN_MAXING_CONFORMAL };
+
+    enum PREDICATES_MODE { NO_CHECK, STATUS_UPDATE, CHECK_IN_LBFGS, STRONG_ENFORCEMENT }; 
+
+}
+
+/*!
+\ingroup PkgMeshOptimization
+
+The class `Mesh_conformal_optimizer` provides an interface to optimize a tetrahedral mesh with a conformal energy, 
+while allowing the user to specify soft-constraints on the boundary and along a curve network. 
+This class is designed for linking with various mesh representations.
+For usage with CGAL common mesh representations, refer to `Triangulation_3_optimizer` and `C3T3_optimizer`.
+
+\tparam TetrahedralMesh encodes the volumetric mesh and must be a model of `MeshDataStructure`.
+
+\tparam BoundaryMesh represents a set of selected polygons with points from Tetrahedral mesh 
+that will be used to define surface constraints on `TetrahedralMesh`. It must be a model of `SurfaceDataStructure`.
+
+\tparam EdgeNetwork represents a set of selected segments with points from Tetrahedral mesh 
+that will be used to add curve constraints on `TetrahedralMesh`. It must be a model of `PolylinesDataStructure`.
+
+
+\sa `CGAL::Mesh_optimization::Triangulation_3_optimizer`
+\sa `CGAL::Mesh_optimization::C3T3_optimizer`
+
+*/
 template<
     typename TetrahedralMesh = default_structures::Empty_mesh,
     typename BoundaryMesh = default_structures::Empty_boundary<typename TetrahedralMesh::Vertex_descriptor>,
@@ -15,25 +52,79 @@ template<
 >
 class Mesh_conformal_optimizer {
 public:
-    using Vertex_descriptor = typename TetrahedralMesh::Vertex_descriptor;
-    using Cell_descriptor = typename TetrahedralMesh::Cell_descriptor;
-    using Point_3 = typename TetrahedralMesh::Point_3;
-    using Normal_3 = typename BoundaryMesh::Normal_3;
-    template<typename T> using Vertex_descriptor_map = std::unordered_map<Vertex_descriptor, T>; // todo: manage to template that?
-    template<typename T> using Cell_descriptor_map = std::unordered_map<Cell_descriptor, T>;
+    /*!
 
+    */
+    using Vertex_descriptor = typename TetrahedralMesh::Vertex_descriptor;
+    
+    /*!
+
+    */
+    using Cell_descriptor = typename TetrahedralMesh::Cell_descriptor;
+    
+    /*!
+
+    */
+    using Point_3 = typename TetrahedralMesh::Point_3;
+    
+    /*!
+
+    */
+    using Normal_3 = typename BoundaryMesh::Normal_3;
+    
+    /*!
+
+    */
+    template<typename T> using Vertex_descriptor_map = std::unordered_map<Vertex_descriptor, T>; // todo: manage to template that?
+    template<typename T> using Cell_descriptor_map = std::unordered_map<Cell_descriptor, T>; // internal usage
+
+    /*!
+        Constructor of the class, it does not perform any operation
+    */
     Mesh_conformal_optimizer(TetrahedralMesh &mesh, BoundaryMesh const &boundary = BoundaryMesh(), EdgeNetwork const &edge_network = EdgeNetwork());
 
+    /*!
+        Locks (or unlock) all vertices contained in the input BoundaryMesh. 
+        It is independent from the other locking functions, and unlocking will not interfere with manually set locks. 
+        Set by default as true if no `set_boundary_query` is called. 
+    */
     void set_locked_boundary(bool locked = true);
 
+    /*!
+
+    */
     void set_verbose(bool verbose = true);
+    
+    /*!
+        Max number of high level iterations done by the optimizer. Each iteration can be seen as equivalent to a Newton step. 
+        Untangling may require a high number of iterations to converge (100), simple mesh improvement will usually require less (from 1 to 10). 
+        Default is 1000. 
+    */
     void set_max_number_of_iteration(unsigned number_of_iterations);
 
     // todo: locks are relatively inefficient because they use a map. Should it be improved?
+
+
+    /*!
+        Hard-constraining a certain vertex to its current coordinates
+    */
     void set_vertex_Lock(Vertex_descriptor vertex, bool locked = true);
+
+    /*!
+        Hard-constraining only 1 dimension for the given vertex
+    */
     void set_vertex_dim_lock(Vertex_descriptor vertex, unsigned dimension, bool locked = true);
+
+    /*!
+        Setting all of the locked vertices at once. 
+        Use this function to maximize performance when having tricky locks configuration. 
+        Note that this will override all previously add locks, except those from `set_locked_boundary`. 
+    */
     void set_vertices_dim_locks(Vertex_descriptor_map<std::array<bool, 3>> const &vertex_dimension_locks);
 
+    /*!
+        Helper function to set locked vertices from a container. 
+    */
     template <typename Container>
     void set_locked_vertices(Container const &vertices) {
         for (Vertex_descriptor vertex : vertices) {
@@ -41,49 +132,174 @@ public:
         }
     }
 
+    /*!
+        Remove all previously set locks.
+    */
     void clear_locks();
 
-    // QUERIES FOR BOUNDARY PROJECTION
-    using Plane = std::tuple<Point_3, Normal_3>;
+    // QUERIES FOR BOUNDARY PROJECTION    
+    
+    /*!
+        Plane type to which the boundary polygons should align.
+        the last parameter is a weight that is used to indicate the importance of the constraint.
+        By default, use the value 1. 
+    */
+    using Plane = std::tuple<Point_3, Normal_3, double>;
 
+    /*!
+        Projection function. 
+        
+        \param coord center of polygon 
+        \param surface_id patch id of the polygon as defined in `BoundaryMesh`
+        \param radius indicator of the average edge length of the polygon
+        \return Plane to which the polygon should align (usually closest tangential plane of the target geometry)
+
+        \warning Must be thread safe -- it will be called in an OpenMP context. 
+    */
     using Boundary_point_query = std::function<Plane (Point_3 const &coord, unsigned surface_id, double radius)>;
-    using Boundary_polygon_query = std::function<Plane (std::vector<Point_3> const &triangle, unsigned surface_id)>;
-    using Boundary_point_batch_query = std::function<void (std::vector<Point_3> const &coord, std::vector<unsigned> &surface_id, std::vector<double> &radius, std::vector<Plane> &results)>;
-    using Boundary_polygon_batch_query = std::function<void (std::vector<std::vector<Point_3>> const &triangles, std::vector<unsigned> &surface_id, std::vector<Plane> &results)>;
 
-    // use the last setting that was called
-    // batch will call every point at every iteration, while singular will call only the needed ones.
-    // Important:
-    //   - singular calls must be thread safe.
-    //   - batch will not change the behavior: only needed values will be used (i.e. use only if your singular calls are particularly slow).
-    //   - point_query will query at the center of the polygon with its area as a guess of the radius. Favor the polygon query when possible.
+    /*!
+        Projection function. 
+        
+        \param polygon vector containing the current points of the polygon 
+        \param surface_id patch id of the polygon as defined in `BoundaryMesh`
+        \return Plane to which the polygon should align (usually closest tangential plane of the target geometry)
+
+        \warning Must be thread safe -- it will be called in an OpenMP context. 
+    */
+    using Boundary_polygon_query = std::function<Plane (std::vector<Point_3> const &polygon, unsigned surface_id)>;
+
+    /*!
+        Batch projection function. Equivalent of `Boundary_point_query`. 
+        Will be called in more systemic manner, so will produce slower results. Use if single calls are slower, or to avoid thread-safe requirements. 
+        
+        \param coords vector with center of each polygon 
+        \param surface_ids vector with patch ids of each polygon as defined in `BoundaryMesh`
+        \param radii vector with indicator of the average edge length for each polygon
+        \param[out] results vector with target plane for each polygon
+    */
+    using Boundary_point_batch_query = std::function<void (std::vector<Point_3> const &coords, std::vector<unsigned> &surface_ids, std::vector<double> &radii, std::vector<Plane> &results)>;
+
+    /*!
+        Batch projection function. Equivalent of `Boundary_polygon_query`. 
+        Will be called in more systemic manner, so will produce slower results. Use if single calls are slower, or to avoid thread-safe requirements. 
+        
+        \param polygons vector with a vector of points for each polygon 
+        \param surface_ids vector with patch ids of each polygon as defined in `BoundaryMesh`
+        \param[out] results vector with target plane for each polygon
+    */
+    using Boundary_polygon_batch_query = std::function<void (std::vector<std::vector<Point_3>> const &polygons, std::vector<unsigned> &surface_id, std::vector<Plane> &results)>;
+
+
+    /*!
+        set constraint query for surface as a `Boundary_point_query`
+    */
     void set_boundary_query(Boundary_point_query boundary_query);
+
+    /*!
+        set constraint query for surface as a `Boundary_polygon_query`
+    */
     void set_boundary_query(Boundary_polygon_query boundary_query);
+    
+    /*!
+        set constraint query for surface as a `Boundary_point_batch_query`
+    */
     void set_boundary_query(Boundary_point_batch_query boundary_query);
+    
+    /*!
+        set constraint query for surface as a `Boundary_polygon_batch_query`
+    */
     void set_boundary_query(Boundary_polygon_batch_query boundary_query);
 
 
     // QUERIES FOR CURVE NETWORK PROJECTION
-    using Curve_tangent = std::tuple<Point_3, Normal_3>;
+    /*!
+        Tangent vector and point to which the curve segment should align.
+        Last parameter is a weight that is used to indicate the importance of the constraint.
+        By default, use the value 1.
+    */
+    using Curve_tangent = std::tuple<Point_3, Normal_3, double>;
 
+    /*!
+        Projection function. 
+        
+        \note Thread safe is not required here -- subject to change if specific cases require it.
+        
+        \param coord center of edge 
+        \param curve_id id of the curve as defined in `EdgeNetwork`
+        \param radius edge length
+        \return Curve_tangent to which the edge should align (usually closest tangential direction of the target geometry)
+    */
     using Curve_point_query = std::function<Curve_tangent (Point_3 const &coord, unsigned curve_id, double radius)>;
+    
+    /*!
+        Projection function. 
+
+        \note Thread safe is not required here -- subject to change if specific cases require it.
+        
+        \param edge array containing the two points of the edge
+        \param curve_id id of the curve as defined in `EdgeNetwork`
+        \return Curve_tangent to which the edge should align (usually closest tangential direction of the target geometry)
+    */
     using Curve_segment_query = std::function<Curve_tangent (std::array<Point_3, 2> const &edge, unsigned curve_id)>;
+    
+    /*!
+        Batch projection function. Equivalent of `Curve_point_query`. 
+        Will be called in more systemic manner, so will produce slower results. Use if single calls are slower. 
+        
+        \param coords vector with center of each edge 
+        \param curve_ids vector with curve id of each edge as defined in `EdgeNetwork`
+        \param radii vector with edge length of each edge
+        \param[out] results vector with target curve tangent for each edge
+    */
     using Curve_point_batch_query = std::function<void (std::vector<Point_3> const &coord, std::vector<unsigned> &curve_ids, std::vector<double> &radius, std::vector<Curve_tangent> &results)>;
+    
+    /*!
+        Batch projection function. Equivalent of `Curve_segment_query`. 
+        Will be called in more systemic manner, so will produce slower results. Use if single calls are slower. 
+        
+        \param edges vector with couple of points for each edge 
+        \param curve_ids vector with curve ids of each edge as defined in `EdgeNetwork`
+        \param[out] results vector with target curve tangent for each edge
+    */
     using Curve_segment_batch_query = std::function<void (std::vector<std::array<Point_3, 2>> const &edges, std::vector<unsigned> &curve_ids, std::vector<Curve_tangent> &results)>;
 
-    // see set_boundary_query for comments on how to use those functions
-    // note that for simplicity purposes, curve query and boundary term are purely serial. If you have a use case where it is limiting, it is something we can change
-    void set_curves_query(Curve_point_query boundary_query);
-    void set_curves_query(Curve_segment_query boundary_query);
-    void set_curves_query(Curve_point_batch_query boundary_query);
-    void set_curves_query(Curve_segment_batch_query boundary_query);
+
+    /*!
+        set constraint query for curves as a `Curve_point_query`
+    */
+    void set_curves_query(Curve_point_query curve_query);
+
+    /*!
+        set constraint query for curves as a `Curve_segment_query`
+    */
+    void set_curves_query(Curve_segment_query curve_query);
+    
+    /*!
+        set constraint query for curves as a `Curve_point_batch_query`
+    */
+    void set_curves_query(Curve_point_batch_query curve_query);
+    
+    /*!
+        set constraint query for curves as a `Curve_segment_batch_query`
+    */
+    void set_curves_query(Curve_segment_batch_query curve_query);
 
     // ADDING QUADRATIC TARGETS FOR VERTICES
 
-    // quadratic energy minimization towards target positions
-    void set_vertex_target_position(Vertex_descriptor v, Point_3 const &target_positions);
-    void set_vertex_target_positions(std::vector<std::pair<Vertex_descriptor, Point_3>> const &target_positions);
+    /*!
+        set soft constraint for a given vertex
+    */
+    void set_vertex_target_position(Vertex_descriptor v, Point_3 const &target_positions, double weight = 1.0);
 
+    /*!
+        set the list of soft constraints for vertices. Note that it overrides previously set vertex constraints. 
+    */
+    void set_vertex_target_positions(std::vector<std::tuple<Vertex_descriptor, Point_3, double>> const &target_positions);
+
+    /*!
+        set soft constraints from a container of [vertex, coord] pairs.  
+    */
     template <typename Container>
     void set_vertex_target_positions(Container const &target_positions) {
         for (auto const & [v, pt] : target_positions) {
@@ -91,21 +307,64 @@ public:
         }
     }
 
+    /*!
+        Clear previously set vertex soft constraints
+    */
     void clear_vertex_target_positions();
 
-    void naive_smooth(); // runs gradient based laplacian smoothing
+    /*!
+        Set the weight on the boundary term of the energy.
+        Default is 1. 10 will strongly enforce the boundary matching, 1e-3 will only have a slight effect, favoring the inside meshing.
+        Warning: large value can lead to convergence issues if the boundary is not initialized on its contraint. 
+    */
+    void set_boundary_weight(double weight); // large values can lead to convergence issues
 
-    bool untangle();
 
-    bool maximize_quality(); // currently not well tested with boundary constraints
+    
+    /*!
+        Set boundary with pre-set recommended parameters.
+    */
+    void set_boundary_weight(Parameters::BOUNDARY_WEIGHTING_MODE mode);
+
+    /*!
+        Start the optimization procedure
+    */
+    bool run();
 
 public: // for advanced usage. Do not touch if you do not know what you are doing.
 
+
+    void set_optimization_mode(Parameters::OPTIMIZATION_MODE mode);
+
     void set_minimum_valid_edge_size(double edge_size);  // should be a minimum bound on the valid edge size of the mesh, used as a reference for untangling
 
-    void set_boundary_weight(double weight); // large values can lead to convergence issues
-
     unsigned get_total_number_of_lbfgs_iterations() const;
+
+    // return a negative value if you don't want enforce a sizing on a given vertex. 
+    using Point_target_sizing_query = std::function<double (Vertex_descriptor vertex, Point_3 const &coord)>;
+    using Point_target_sizing_batch_query = std::function<void (std::vector<Vertex_descriptor> const &vertices, std::vector<Point_3> const &coords, std::vector<double> &sizings)>;
+
+    void set_vertex_target_sizing_query(Point_target_sizing_query query); // todo: implementation of that is not finished
+    void set_vertex_target_sizing_query(Point_target_sizing_batch_query query);
+
+    
+
+    /*
+        ONLY USE IF YOUR MESH NEEDED PREDICATES TO BE GENERATED VALID IN THE FIRST PLACE
+        i.e. the code will not break already "good" meshes, 
+        and enforcing strong orientation may significantly throttle minimization
+        Parameter is set to STATUS_UPDATE if invalid elements are in the input
+        Default is NO_CHECK
+    */
+    void set_predicates_mode(Parameters::PREDICATES_MODE mode);
+
+    // first unsigned is number of det <= 0, second is with exact predicates
+    // optional std::vector gives the det and exact predicate computation of each cell.
+    // Warning: will have to create a full instance of smoother, so it is not a cheap function to call
+    std::pair<unsigned, unsigned> get_nb_of_inverted_cells(Cell_descriptor_map<std::pair<double, bool>> *cell_determinants = nullptr);
+
+    // only when CHECK_IN_LBFGS is enabled. 
+    unsigned get_number_of_invalid_steps_measured_by_predicates() const;
 
 public: // for advanced monitoring
 
@@ -127,11 +386,13 @@ private:
     Vertex_descriptor_map<std::array<bool, 3>> _user_locks;
     BoundaryMesh const &_boundary;
     EdgeNetwork const &_edge_network;
-    std::vector<std::pair<Vertex_descriptor, Point_3>> _vertex_target_positions;
+    std::vector<std::tuple<Vertex_descriptor, Point_3, double>> _vertex_target_positions;
 
     // options
     bool _verbose = false;
     bool _lock_boundary = true;
+    Parameters::OPTIMIZATION_MODE _optimization_mode = Parameters::CONFORMAL;
+    Parameters::PREDICATES_MODE _predicates_mode = Parameters::NO_CHECK;
 
     unsigned _max_number_of_iteration = 1000;
     double _min_valid_edge_size = 1e-6;
@@ -178,6 +439,9 @@ private:
     std::vector<std::vector<Point_3>> _boundary_batch_info_polygons;
     std::vector<Plane> _boundary_batch_planes;
 
+    void initialise_boundary_query(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &);
+
+
     std::vector<std::array<unsigned, 2>> _curve_edges;
     std::vector<unsigned> _curve_ids;
     QUERY_TYPE _curve_query_type = NONE;
@@ -190,7 +454,15 @@ private:
     std::vector<std::array<Point_3, 2>> _curve_batch_info_edges;
     std::vector<Curve_tangent> _curve_batch_tangents;
 
-    std::vector<std::pair<unsigned, Eigen::Vector3d>> _point_targets;
+    void initialise_curve_queries(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &);
+
+
+    std::vector<std::tuple<unsigned, Eigen::Vector3d, double>> _point_targets;
+
+
+    QUERY_TYPE _target_size_query_type = NONE;
+    Point_target_sizing_query _target_size_query; 
+    Point_target_sizing_batch_query _target_size_batch_query; 
 
     double _scale = 1.;
     Eigen::Vector3d _shift = Eigen::Vector3d::Zero();
@@ -209,12 +481,15 @@ private:
     bool run_callback(Iteration_status const &, std::vector<Vertex_status> const &, std::vector<Cell_status> const&);
 
     unsigned _nb_lbfgs_iterations = 0;
+    unsigned _nb_predicates_invalid_steps = 0;
 
     void initialise_optimizer(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &);
-    void initialise_boundary_query(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &);
-    void initialise_curve_queries(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &);
 };
 
+
+
 }
+
+
 
 #include "internal/Mesh_conformal_optimizer_impl.hpp"

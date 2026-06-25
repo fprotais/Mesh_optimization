@@ -142,12 +142,12 @@ int main(int argc, char** argv) {
         compute_octree_from_mesh_surface(mesh, octree, face_normal);
     }
 
-    auto query = [&](cinolib::vec3d pt, unsigned, double) -> std::tuple<cinolib::vec3d, cinolib::vec3d> {
+    auto query = [&](cinolib::vec3d pt, unsigned, double) -> std::tuple<cinolib::vec3d, cinolib::vec3d, double> {
         unsigned id;
         cinolib::vec3d proj;
         double dist;
         octree.closest_point(pt, id, proj, dist);
-        return {proj, face_normal[id]};
+        return {proj, face_normal[id], 1.};
     };
 
 
@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
 
     optimizer.set_verbose();
     optimizer.set_max_number_of_iteration(100);
-    optimizer.untangle();
+    optimizer.run();
 
     mesh.save("output.mesh");
 

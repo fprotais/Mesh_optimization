@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 
     optimizer.set_vertex_target_positions(handles);
 
-    bool res = optimizer.untangle();
+    bool res = optimizer.run();
 
     std::cerr << "Smoothing result = " << (res ? "SUCCESS" : "FAILURE") << std::endl;
     igl::writeMESH("handle_output.mesh", V, T, F);

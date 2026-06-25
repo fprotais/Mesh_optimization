@@ -224,13 +224,13 @@ int main(int argc, char** argv)
     std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds> (end - begin).count() << "[ms]" << std::endl;
     std::cout << "AFTER REMESHING: " << tr.number_of_vertices() << " vertices, " << tr.number_of_cells() << " cells" << std::endl;
 
-    auto boundary_query = [&](Point_3 pt, unsigned, double) -> std::tuple<Point_3, K::Vector_3>{
+    auto boundary_query = [&](Point_3 pt, unsigned, double) -> std::tuple<Point_3, K::Vector_3, double>{
         auto pp_and_prim = oracle.tree().closest_point_and_primitive(pt);
         Point_3 proj = pp_and_prim.first;
         K::Vector_3 normal { proj, pt };
         normal = normal / CGAL::approximate_sqrt(normal * normal);
         proj = proj + offset * normal;
-        return {proj, normal};
+        return {proj, normal, 1.};
     };
 
 
@@ -268,7 +268,7 @@ int main(int argc, char** argv)
     optimizer.set_verbose();
 
     optimizer.set_locked_vertices(boundary_vertices);
-    optimizer.untangle();
+    optimizer.run();
 
     std::ofstream all_after_smoothed("offset_wrapper.mesh");
     CGAL::IO::write_MEDIT(all_after_smoothed, tr, CGAL::parameters::all_cells(false));
@@ -277,9 +277,9 @@ int main(int argc, char** argv)
     optimizer.set_vertices_dim_locks(locked);
     optimizer.set_boundary_query(boundary_query);
     optimizer.set_max_number_of_iteration(100);
-    optimizer.untangle();
+    optimizer.run();
     optimizer.clear_locks();
-    optimizer.untangle();
+    optimizer.run();
 
 
     std::ofstream inside_after_smoothed("offset_ours.mesh");

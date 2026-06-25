@@ -6,6 +6,8 @@
 #include <Eigen/Eigen>
 #include <random>
 
+#include "predicates/predicates.h"
+
 namespace Mesh_optimization_internal {
 
 class Tetrahedral_conformal_optimizer {
@@ -18,7 +20,7 @@ public:
         std::vector<std::vector<unsigned>> const &vert2tet_corner
     );
 
-    using Plane = std::pair<Eigen::Vector3d, Eigen::Vector3d>; // point, normal
+    using Plane = std::tuple<Eigen::Vector3d, Eigen::Vector3d, double>; // point, normal, weight
     using Boundary_query = std::function<Plane (std::vector<Eigen::Vector3d> const &poly, unsigned surface_id)>;
     using Boundary_batch_query = std::function<void (std::vector<std::vector<Eigen::Vector3d>> const &polys, std::vector<unsigned> surface_id, std::vector<Plane> &results)>;
 
@@ -45,7 +47,7 @@ public:
     );
 
 
-    using Curve_tangent = std::pair<Eigen::Vector3d, Eigen::Vector3d>; // point, normal
+    using Curve_tangent = std::tuple<Eigen::Vector3d, Eigen::Vector3d, double>; // point, normal, weight
 
     using Curve_query = std::function<Curve_tangent (std::array<Eigen::Vector3d, 2> const &edge, unsigned curve_id)>;
     using Curve_batch_query = std::function<void (std::vector<std::array<Eigen::Vector3d, 2>> const &edges, std::vector<unsigned> curve_ids, std::vector<Curve_tangent> &results)>;
@@ -61,7 +63,14 @@ public:
         Curve_batch_query query
     );
 
-    void set_quadratic_target_positions(std::vector<std::pair<unsigned, Eigen::Vector3d>> const &targets);
+    void set_quadratic_target_positions(std::vector<std::tuple<unsigned, Eigen::Vector3d, double>> const &targets);
+
+
+    using Size_query = std::function<double (unsigned vertex_id, Eigen::Vector3d coord)>;
+    using Size_batch_query = std::function<void (std::vector<unsigned> const &vertices, std::vector<Eigen::Vector3d> coords, std::vector<double> &sizes)>;
+
+    void set_target_sizing(Size_query query); // todo: implement and use. 
+    void set_target_sizing(Size_batch_query query);
 
     unsigned max_lbfgs_iter = 500;
 
@@ -71,7 +80,7 @@ public:
 
     double boundary_weight = 1.;
 
-    bool verbose = true;
+    bool verbose = false;
     bool fine_time_logging = false;
 
     bool laplacian_precond = false;
@@ -93,6 +102,19 @@ public:
 
     unsigned number_of_outer_iter = 0;
     unsigned number_of_lbfgs_iter = 0;
+
+public:
+    bool exact_predicate_status = false; 
+    bool exact_predicate_optimization_check = false; 
+    bool exact_predicate_linesearch_enforcement = false; 
+
+    std::vector<bool> const &get_predicate_is_positive() {
+        evaluate_exact_predicates(); 
+        return _predicate_is_positive; 
+    }    
+
+    unsigned get_number_of_invalid_steps_with_predicates() const { return _predicates_nb_invalid_steps; }
+
 public:
 
     enum DEBUG_CALLBACK_SETTING {NOTHING, OUTER_ITER, LBFGS_ITER} callback_setting = NOTHING;
@@ -188,6 +210,11 @@ private:
     void update_local_size();
     std::vector<double> _local_size;
 
+    std::vector<bool> _predicate_is_positive;
+    unsigned _predicates_nb_invalid_steps = 0;
+    unsigned evaluate_exact_predicates(Eigen::VectorXd const *x = nullptr);
+    double _predicate_infinite_energy = 1e100;
+
     void gather_energy_gradient(Eigen::VectorXd &g) const;
 private:
     // untangling / smoothing
@@ -199,8 +226,13 @@ private:
     double regularized_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g = nullptr);
     double power_mips_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g = nullptr);
     double mips_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g = nullptr);
+    double sym_dirichlet_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g = nullptr);
 
     inline double untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g = nullptr) {
+        if (exact_predicate_linesearch_enforcement) {
+            unsigned nb_invalid = evaluate_exact_predicates(&x);
+            if (nb_invalid != 0) return _predicate_infinite_energy;
+        }
         return power_mips_untangling_energy(x, g);
     }
 
@@ -287,7 +319,7 @@ private:
     std::vector<Curve_tangent> _edge_batch_query_results;
 
     std::vector<double> _point_prev_target_weight;
-    std::vector<std::pair<unsigned, Eigen::Vector3d>> _point_target_position;
+    std::vector<std::tuple<unsigned, Eigen::Vector3d, double>> _point_target_position;
 
     bool has_curves_and_points_terms() const;
     void update_curves_and_points_info(Eigen::VectorXd const &x, bool reset = false);
@@ -321,6 +353,7 @@ inline Tetrahedral_conformal_optimizer::Tetrahedral_conformal_optimizer(
 , _determinants(tetrahedra.size(), 0)
 , _conformal_energies(tetrahedra.size(), 1)
 , _local_size(nb_vertices(), min_valid_edge_size)
+, _predicate_is_positive(tetrahedra.size(), true)
 {
     for (unsigned t = 0; t < tetrahedra.size(); ++t) {
         _tet_storage[t].verts = tetrahedra[t];
@@ -412,7 +445,7 @@ inline void Tetrahedral_conformal_optimizer::set_curve_network_with_batch_query(
 }
 
 inline void Tetrahedral_conformal_optimizer::set_quadratic_target_positions(
-        std::vector<std::pair<unsigned, Eigen::Vector3d>> const &targets
+        std::vector<std::tuple<unsigned, Eigen::Vector3d, double>> const &targets
 )
 {
     _point_prev_target_weight.resize(targets.size());
@@ -567,6 +600,29 @@ inline void Tetrahedral_conformal_optimizer::update_local_size() {
     }
 }
 
+unsigned Tetrahedral_conformal_optimizer::evaluate_exact_predicates(Eigen::VectorXd const *x) {
+    unsigned invalid_tet = 0;
+
+    Eigen::VectorXd const & coords = x == nullptr ? _coords : *x;
+
+    #pragma omp parallel for reduction(+: invalid_tet)
+    for (int iter_t = 0; iter_t < static_cast<int>(_tet_storage.size()); ++iter_t) {
+        unsigned t = static_cast<unsigned>(iter_t);
+        Tet_storage const &tet = _tet_storage[t];
+        bool exact_check = exact_predicates::positive_tetrahedra({
+            Math_functions::sub_line_vector(coords,tet.verts[0]),
+            Math_functions::sub_line_vector(coords,tet.verts[1]),
+            Math_functions::sub_line_vector(coords,tet.verts[2]),
+            Math_functions::sub_line_vector(coords,tet.verts[3])
+        });
+        
+        invalid_tet += !exact_check;
+        if (x == nullptr) _predicate_is_positive[t] = exact_check;
+    }
+    return invalid_tet;
+}
+
+
 bool Tetrahedral_conformal_optimizer::run_callback(OPTIMIZATION_TYPE opt_type, unsigned iter, LBFGS_status lbfgs_status, Eigen::VectorXd const *g) {
     if (callback_function == nullptr) return false;
     if (callback_setting == DEBUG_CALLBACK_SETTING::NOTHING) return false;
@@ -656,7 +712,7 @@ inline void Tetrahedral_conformal_optimizer::update_untangling_eps(double decrea
 
     _untangling_eps = (std::min)(foldover_eps, _1999_eps);
 
-    // I don't remember how I obtained this formula, but it was working well for hard untangling. To study again.
+    // todo: I don't remember how I obtained this formula, but it was working well for hard untangling. To study again.
     // double c = sqrt(_untangling_eps*_untangling_eps+weighted_det_min*weighted_det_min);
     // double decrease = (1-sigma*c/(std::abs(weighted_det_min) + c));
     // double custom_eps = decrease * _untangling_eps;
@@ -713,6 +769,8 @@ inline double Tetrahedral_conformal_optimizer::mips_untangling_energy(Eigen::Vec
 
     return F;
 }
+
+
 
 inline double Tetrahedral_conformal_optimizer::power_mips_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
     double untangling_max_energy = 1.;
@@ -809,6 +867,55 @@ inline double Tetrahedral_conformal_optimizer::regularized_untangling_energy(Eig
         Eigen::Matrix3d dfdJ = J * (weight * 3. * root_trace / c1)
                              - K * (weight * (f * c2/c1
                                              + det_regularization_weight * delta * (g * c2_g - 2*d_g)/c1_g));
+
+        dfdJ.transposeInPlace();
+        for (unsigned v = 0; v < 4; ++v) {
+            tet.vert_grad[v] = dfdJ * tet.ig[v];
+        }
+    }
+    if (grad != nullptr)
+        gather_energy_gradient(*grad);
+
+    _untangling_max_energy = untangling_max_energy;
+
+    return F;
+}
+
+inline double Tetrahedral_conformal_optimizer::sym_dirichlet_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
+    double untangling_max_energy = 1.;
+    double F = 0;
+
+#pragma omp parallel for reduction(+:F) reduction(max: untangling_max_energy)
+    for (int iter_t = 0; iter_t < static_cast<int>(_tet_storage.size()); ++iter_t) {
+        unsigned t = static_cast<unsigned>(iter_t);
+        Tet_storage &tet = _tet_storage[t];
+        if (tet.skip) continue;
+        double scaled_epsilon = tet.det_estimation*_untangling_eps;
+        double weight = tet.local_edge_size;
+
+        Eigen::Matrix3d J = tet.compute_jacobian(x);
+        double det = J.determinant();
+
+        double c1 = Math_functions::chi(scaled_epsilon, det);
+        double inv_c1 = 1./c1;
+        double cbrt_c1 = std::cbrt(c1);
+        double trace = J.squaredNorm();
+
+        double f =  trace * cbrt_c1 * inv_c1; //f / std::pow(c1, 2./3.);
+
+        tet.fval = f;
+        untangling_max_energy = (std::max)(untangling_max_energy, tet.fval);
+
+        F +=  weight * f;
+
+        if (grad == nullptr) continue;
+
+        double c3 = Math_functions::chi_deriv(scaled_epsilon, det);
+
+        Eigen::Matrix3d K = Math_functions::dual_basis(J);
+
+        Eigen::Matrix3d dfdJ = J * (weight * 2. * cbrt_c1 * inv_c1)
+                             - K * (weight * (2./3.) * f * c3 * inv_c1 );
 
         dfdJ.transposeInPlace();
         for (unsigned v = 0; v < 4; ++v) {
@@ -944,20 +1051,22 @@ inline void Tetrahedral_conformal_optimizer::update_boundary_info(Eigen::VectorX
         poly.avg_edge_size = std::pow(10., poly.avg_edge_size);
 
         if (!_boundary_batch_mode) update_poly_coord(t);
-        auto [pt, n] = _boundary_batch_mode ? _boundary_batch_query_results[t] : _boundary_query(_boundary_live_coords[t], poly.surface_id);
+        auto [pt, n, weight] = _boundary_batch_mode ? _boundary_batch_query_results[t] : _boundary_query(_boundary_live_coords[t], poly.surface_id);
 
         poly.max_drift = MAX_DRIFT_BEFORE_UPDATE*poly.avg_edge_size;
-        poly.A = n * n.transpose();
+        poly.A = weight* n * n.transpose();
         poly.pt = pt;
-
-        double max_poly_relative_dist = 0.;
-        for (unsigned v : poly.verts) {
-            Eigen::Vector3d dir = poly.pt - Math_functions::sub_col_vector(x, v);
-            double dist = dir.transpose() * poly.A * dir;
-            dist /= _local_size[v]*_local_size[v];
-            max_poly_relative_dist = (std::max)(max_poly_relative_dist, dist);
+        if (reset) {
+            double max_poly_relative_dist = 0.;
+            for (unsigned v : poly.verts) {
+                Eigen::Vector3d dir = poly.pt - Math_functions::sub_col_vector(x, v);
+                double dist = dir.transpose() * poly.A * dir;
+                dist /= _local_size[v]*_local_size[v];
+                max_poly_relative_dist = (std::max)(max_poly_relative_dist, dist);
+            }
+            poly.weight = 1./(std::max)(MAXIMUM_RELATIVE_DISTANCE_RE_WEIGHTING,max_poly_relative_dist);
         }
-        if (reset) poly.weight = 1./(std::max)(MAXIMUM_RELATIVE_DISTANCE_RE_WEIGHTING,max_poly_relative_dist);
+
     }
 }
 
@@ -1023,10 +1132,10 @@ inline void Tetrahedral_conformal_optimizer::update_curves_and_points_info(Eigen
         edge.prev_center = center;
         double avg_edge_size = std::sqrt(_local_size[edge.verts[0]]*_local_size[edge.verts[1]]);
 
-        auto [pt, n] = _curve_batch_mode ? _edge_batch_query_results[e] : _curve_query({pt0, pt1}, edge.curve_id);
+        auto [pt, n, weight] = _curve_batch_mode ? _edge_batch_query_results[e] : _curve_query({pt0, pt1}, edge.curve_id);
 
         edge.max_drift = MAX_DRIFT_BEFORE_UPDATE*avg_edge_size;
-        edge.A = Eigen::Matrix3d::Identity() - n * n.transpose();
+        edge.A = weight * (Eigen::Matrix3d::Identity() - n * n.transpose());
         edge.pt = pt;
 
         double max_edge_relative_dist = 0.;
@@ -1040,7 +1149,7 @@ inline void Tetrahedral_conformal_optimizer::update_curves_and_points_info(Eigen
     }
 
     for (unsigned i = 0; i < _point_target_position.size(); ++i) {
-        double curr_dist = (Math_functions::sub_col_vector(x, _point_target_position[i].first) - _point_target_position[i].second).squaredNorm();
+        double curr_dist = (Math_functions::sub_col_vector(x, std::get<0>(_point_target_position[i])) - std::get<1>(_point_target_position[i])).squaredNorm();
          if (reset) _point_prev_target_weight[i] = 1./(std::max)(MAXIMUM_RELATIVE_DISTANCE_RE_WEIGHTING,curr_dist);
     }
 }
@@ -1068,9 +1177,9 @@ inline double Tetrahedral_conformal_optimizer::curves_and_points_energies(Eigen:
     }
 
     for (unsigned i = 0; i < _point_target_position.size(); ++i) {
-        unsigned v = _point_target_position[i].first;
-        Eigen::Vector3d target = _point_target_position[i].second;
-        double weight = _point_prev_target_weight[i] * drift / _local_size[v];
+        unsigned v = std::get<0>(_point_target_position[i]);
+        Eigen::Vector3d target = std::get<1>(_point_target_position[i]);
+        double weight = std::get<2>(_point_target_position[i]) * _point_prev_target_weight[i] * drift / _local_size[v];
 
         Eigen::Vector3d dn = Math_functions::sub_col_vector(x, v) - target;
         F += weight * dn.squaredNorm();
@@ -1156,6 +1265,17 @@ inline bool Tetrahedral_conformal_optimizer::run_untangling(unsigned max_number_
     if (verbose && has_bnd_terms()) std::cout << "Boundary energy: " << boundary_energy(_coords)  << std::endl;
     if (verbose && has_curves_and_points_terms()) std::cout << "Curves and point energy: " << curves_and_points_energies(_coords)  << std::endl;
 
+
+    if (exact_predicate_status) {
+        unsigned curr_invalid = evaluate_exact_predicates();
+        if (verbose) std::cout << "Exact predicate check: " << curr_invalid << " invalid tetrahedra" << std::endl;
+        if (curr_invalid != 0) {
+            exact_predicate_linesearch_enforcement = false; // would not move otherwise
+            exact_predicate_optimization_check = false; // would way too talkative
+        }
+        _predicates_nb_invalid_steps = 0;
+    }
+    
     if (run_callback(UNTANGLING, 0)) {
         if (verbose) std::cout << "Early callback stop. Returning false." << std::endl;
         return false;
@@ -1224,11 +1344,20 @@ inline bool Tetrahedral_conformal_optimizer::run_untangling(unsigned max_number_
         });
         opt._call_back = [&](Eigen::VectorXd const & x, Eigen::VectorXd const & g,double f,double step,unsigned bfgs_iter,unsigned nbEval) {
             bool stop_required = run_callback(UNTANGLING, iter, {bfgs_iter, step, nbEval}, &g);
+            bool significant_step = false;
+            if (exact_predicate_optimization_check) {
+                unsigned curr_invalid = evaluate_exact_predicates();
+                if (curr_invalid != 0) {
+                    ++_predicates_nb_invalid_steps;
+                    significant_step = true;
+                }
+            }
+
             update_boundary_info(x, false);
             update_curves_and_points_info(x, false);
             ++number_of_lbfgs_iter;
             if (fine_time_logging)  fineLogging.log_sub_step("LBFGS iter " + std::to_string(bfgs_iter), "Energy: " + std::to_string(f));
-            else if (verbose) std::cout << "." << std::flush;
+            else if (verbose) std::cout << (significant_step ? "!" : ".") << std::flush;
             if (verbose && stop_required) std::cout << "--- CALLBACK REQUIRED STOPPING ---" << std::flush;
             return stop_required;
         };
@@ -1268,6 +1397,12 @@ inline bool Tetrahedral_conformal_optimizer::run_untangling(unsigned max_number_
             if (verbose) std::cout << "    updating curves and target point data" << std::endl;
             update_curves_and_points_info(_coords, true);
         }
+
+        if (exact_predicate_status) {
+            unsigned curr_invalid = evaluate_exact_predicates();
+            if (verbose) std::cout << "Exact predicate check: " << curr_invalid << " invalid tetrahedra" << std::endl;
+        }
+
         if (run_callback(UNTANGLING, iter+1)) {
             if (verbose) std::cout << "Callback required stop, breaking." << std::endl;
             break;
