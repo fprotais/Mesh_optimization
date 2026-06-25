@@ -108,7 +108,6 @@ int main(int argc, char** argv) {
     GEO::Mesh surface;
     if (argc > 2) {
         const std::string surface_filename = argv[2];
-        std::cout << "Loading surface mesh: " << surface_filename << std::endl;
         if(!GEO::mesh_load(surface_filename, surface)) {
             std::cerr << "Error loading surface mesh: " << surface_filename << std::endl;
             return EXIT_FAILURE;
