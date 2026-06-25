@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
     GEO::Mesh surface;
     if (argc > 2) {
         const std::string surface_filename = argv[2];
+        std::cout << "Loading surface mesh: " << surface_filename << std::endl;
         if(!GEO::mesh_load(surface_filename, surface)) {
             std::cerr << "Error loading surface mesh: " << surface_filename << std::endl;
             return EXIT_FAILURE;
@@ -115,17 +116,21 @@ int main(int argc, char** argv) {
     }
     else {
         surface.copy(mesh);
-        surface.cells.clear();
-        surface.vertices.remove_isolated();
-        surface.facets.triangulate();
     }
+    surface.edges.clear();
+    surface.cells.clear();
+    surface.vertices.remove_isolated();
+    surface.facets.triangulate();
     GEO::MeshFacetsAABB aabb;
     aabb.initialize(surface);
 
     std::vector<GEO::vec3> normal(surface.facets.nb());
     for (auto f : surface.facets) {
         normal[f] = GEO::Geom::mesh_facet_normal(surface, f);
-        normal[f] /= normal[f].length();
+        if (normal[f].length() > 1e-10)
+            normal[f] /= normal[f].length();
+        else
+            normal[f] = GEO::vec3(0., 0., 1.);
     }
 
     std::vector<GEO::index_t> projection_facet(mesh.facets.nb(), GEO::NO_FACET);
@@ -137,6 +142,7 @@ int main(int argc, char** argv) {
     };
 
     GEO::mesh_save(mesh, "input.mesh");
+    GEO::mesh_save(surface, "surf.mesh");
 
     Mesh_wrapper mesh_wrapper(mesh, nullptr); // replacing nullptr by &reference will use it as a reference;
     Boundary_wrapper surface_wrapper{mesh};
