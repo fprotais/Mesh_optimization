@@ -26,7 +26,7 @@ In this case it will operate as a smoothing (or untangling algorithm), improving
 In both cases, the result will be saved as `output.mesh`. The executable `cinolib_smooth` operates in the exact same way and only differentiates from `geogram_smooth` because it uses a different frontend for mesh handling.
 
 # Various queries
-<img src="/assets/images/constraints.jpg" alt="Constraints image" width="500"/>
+<img src="/assets/images/constraints.jpg" alt="Constraints image" width="900"/>
 
 This executable highlight the alignment to all type of queries at the same time: Surface, Curves and a handle. The code can be called as:
 ```Bash
