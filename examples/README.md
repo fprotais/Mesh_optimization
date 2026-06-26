@@ -1,6 +1,7 @@
 
 We provide various examples from the paper:
 * [**Mesh projection and smoothing**](#mesh-smoothing-and-projection) with Geogram or Cinolib
+* [**Usage of various queries**](#various-queries) with Geogram 
 * [**Handle based deformation**](#handle-based-deformation) with LibIGL
 * [**Offset computation with Alpha-wrapper**](#mesh-offsetting) with CGAL
 
@@ -23,6 +24,22 @@ The same executable can also be called with a unique input parameter, as:
 In this case it will operate as a smoothing (or untangling algorithm), improving the mesh quality while trying to preserve the outer boundary.
 
 In both cases, the result will be saved as `output.mesh`. The executable `cinolib_smooth` operates in the exact same way and only differentiates from `geogram_smooth` because it uses a different frontend for mesh handling.
+
+# Various queries
+<img src="/assets/images/constrains.jpg" alt="Constraints image" width="500"/>
+
+This executable highlight the alignment to all type of queries at the same time: Surface, Curves and a handle. The code can be called as:
+```Bash
+./bin/geogram_smooth_custom ../data/cube.mesh ../data/cube.mesh ../data/cube_target_cuves.mesh ../data/cube_target_points.txt
+```
+*cube.mesh* represent the input mesh, from which we read the cells (volume), the facets (surface) and the edges (curves). The second mesh is the surface used as projection, for which we simply use the same model. The third input "cube_target_cuves.mesh" contains the edge mesh forming the triangle that is used for projection. And finally, "cube_target_points.txt" contains vertex handle as: `id x y z`.
+
+The final result will be saved as `output.mesh`. As mentioned in the paper, for this specific case, we use $\lambda_\text{strong} = 10$, see
+
+```C++
+    optimizer.set_boundary_weight(Mesh_optimization::Parameters::STRONG);
+```
+Your application may need a different parameter. 
 
 # Handle based deformation
 <img src="/assets/images/bunny.jpg" alt="Bunny handles" width="1200"/>
