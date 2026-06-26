@@ -88,26 +88,37 @@ public:
     GEO::Mesh const &mesh;
 };
 
+class PolyLine_wrapper {
+public:
+    using Edge_descriptor = int;
+    unsigned nb_edges() const { return mesh.edges.nb(); }
+    GEO::index_range edge_range() const {
+        return GEO::index_range{mesh.edges.begin(), mesh.edges.end()};
+    }
+    unsigned curve_id(Edge_descriptor e) const { return e; }
+    int edge_vertex(Edge_descriptor edge, unsigned i) const { return mesh.edges.vertex(edge, i); }
+public:
+    GEO::Mesh const &mesh;
+};
+
 
 int main(int argc, char** argv) {
     GEO::initialize();
     const std::string filename = (argc > 1) ? argv[1] : "../data/fandisk_kenshi_hexmesh.mesh";
+    const std::string surface_filename = (argc > 2) ? argv[2] : "";
+    const std::string curves_filename = (argc > 3) ? argv[3] : "";
 
     GEO::Mesh mesh;
     if(!GEO::mesh_load(filename, mesh)) {
         std::cerr << "Error loading mesh: " << filename << std::endl;
         return EXIT_FAILURE;
     }
-    mesh.facets.clear();
-    mesh.cells.connect();
-    mesh.cells.compute_borders();
 
     GEO::Mesh reference;
     reference.copy(mesh);
 
     GEO::Mesh surface;
-    if (argc > 2) {
-        const std::string surface_filename = argv[2];
+    if (!surface_filename.empty()) {
         if(!GEO::mesh_load(surface_filename, surface)) {
             std::cerr << "Error loading surface mesh: " << surface_filename << std::endl;
             return EXIT_FAILURE;
@@ -139,16 +150,53 @@ int main(int argc, char** argv) {
         return {res, normal[facet], 1.};
     };
 
+
+    GEO::Mesh curves;
+    if (!curves_filename.empty()) {
+        if(!GEO::mesh_load(curves_filename, curves)) {
+            std::cerr << "Error loading surface mesh: " << curves_filename << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
+    else {
+        curves.copy(mesh);
+    }
+    curves.facets.clear();
+    curves.cells.clear();
+    curves.vertices.remove_isolated();
+    
     GEO::mesh_save(mesh, "input.mesh");
     GEO::mesh_save(surface, "surf.mesh");
+    GEO::mesh_save(curves, "curves.mesh");
+
+    std::vector<GEO::vec3> direction(mesh.edges.nb());
+    for (auto e : curves.edges) {
+        curves.facets.create_triangle(mesh.edges.vertex(e, 0), mesh.edges.vertex(e, 1), mesh.edges.vertex(e, 1));
+        direction[e] = mesh.vertices.point(mesh.edges.vertex(e,1)) - mesh.vertices.point(mesh.edges.vertex(e,0));
+        if (direction[e].length() > 1e-10) direction[e] /= direction[e].length();
+        else direction[e] = GEO::vec3(0., 0., 1.);
+    }
+    GEO::MeshFacetsAABB aabb_curves;
+    aabb_curves.initialize(curves);
+
+    auto curve_query = [&](GEO::vec3 const &coord, unsigned edge_id, double radius) -> std::tuple<GEO::vec3, GEO::vec3, double> {
+        GEO::vec3 res;
+        double sqr_dist;
+        GEO::index_t edge = aabb_curves.nearest_facet(coord, res, sqr_dist);
+        return {res, direction[edge], 1.};
+    };
+
 
     Mesh_wrapper mesh_wrapper(mesh, nullptr); // replacing nullptr by &reference will use it as a reference;
-    Boundary_wrapper surface_wrapper{mesh};
     mesh_wrapper.set_orientation(false, true, false, true); // beware of the orientation of your input elements!
 
-    Mesh_optimization::Mesh_conformal_optimizer optimizer(mesh_wrapper, surface_wrapper);
+    Boundary_wrapper surface_wrapper{mesh};
+    PolyLine_wrapper curve_wrapper{mesh};
+
+    Mesh_optimization::Mesh_conformal_optimizer optimizer(mesh_wrapper, surface_wrapper, curve_wrapper);
 
     optimizer.set_boundary_query(query);
+    optimizer.set_curves_query(curve_query);
 
     optimizer.set_verbose();
     optimizer.set_max_number_of_iteration(100);
