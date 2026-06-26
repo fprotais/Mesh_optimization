@@ -107,6 +107,7 @@ int main(int argc, char** argv) {
     const std::string filename = (argc > 1) ? argv[1] : "../data/fandisk_kenshi_hexmesh.mesh";
     const std::string surface_filename = (argc > 2) ? argv[2] : "";
     const std::string curves_filename = (argc > 3) ? argv[3] : "";
+    const std::string point_targets_filename = (argc > 4) ? argv[4] : "";
 
     GEO::Mesh mesh;
     if(!GEO::mesh_load(filename, mesh)) {
@@ -169,10 +170,10 @@ int main(int argc, char** argv) {
     GEO::mesh_save(surface, "surf.mesh");
     GEO::mesh_save(curves, "curves.mesh");
 
-    std::vector<GEO::vec3> direction(mesh.edges.nb());
+    std::vector<GEO::vec3> direction(curves.edges.nb());
     for (auto e : curves.edges) {
-        curves.facets.create_triangle(mesh.edges.vertex(e, 0), mesh.edges.vertex(e, 1), mesh.edges.vertex(e, 1));
-        direction[e] = mesh.vertices.point(mesh.edges.vertex(e,1)) - mesh.vertices.point(mesh.edges.vertex(e,0));
+        curves.facets.create_triangle(curves.edges.vertex(e, 0), curves.edges.vertex(e, 1), curves.edges.vertex(e, 1));
+        direction[e] = curves.vertices.point(curves.edges.vertex(e,1)) - curves.vertices.point(curves.edges.vertex(e,0));
         if (direction[e].length() > 1e-10) direction[e] /= direction[e].length();
         else direction[e] = GEO::vec3(0., 0., 1.);
     }
@@ -186,6 +187,21 @@ int main(int argc, char** argv) {
         return {res, direction[edge], 1.};
     };
 
+    std::vector<std::tuple<GEO::index_t, GEO::vec3, double>> point_targets;
+
+    if (!point_targets_filename.empty()) {
+        std::ifstream infile(point_targets_filename);
+        if (!infile) {
+            std::cerr << "Error opening point targets file: " << point_targets_filename << std::endl;
+            return EXIT_FAILURE;
+        }
+        GEO::index_t vertex_id;
+        double x, y, z;
+        while (infile >> vertex_id >> x >> y >> z) {
+            point_targets.emplace_back(vertex_id, GEO::vec3(x, y, z), 1.);
+        }
+    }
+
 
     Mesh_wrapper mesh_wrapper(mesh, nullptr); // replacing nullptr by &reference will use it as a reference;
     mesh_wrapper.set_orientation(false, true, false, true); // beware of the orientation of your input elements!
@@ -197,7 +213,9 @@ int main(int argc, char** argv) {
 
     optimizer.set_boundary_query(query);
     optimizer.set_curves_query(curve_query);
+    optimizer.set_vertex_target_positions(point_targets);
 
+    optimizer.set_boundary_weight(Mesh_optimization::Parameters::STRONG);
     optimizer.set_verbose();
     optimizer.set_max_number_of_iteration(100);
     optimizer.run();
