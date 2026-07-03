@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
     GEO::Mesh curves;
     if (!curves_filename.empty()) {
         if(!GEO::mesh_load(curves_filename, curves)) {
-            std::cerr << "Error loading surface mesh: " << curves_filename << std::endl;
+            std::cerr << "Error loading curves mesh: " << curves_filename << std::endl;
             return EXIT_FAILURE;
         }
     }

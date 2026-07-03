@@ -277,54 +277,49 @@ class Triangulation_3_wrapper {
     Triangulation_3 &tr;
 };
 
-template <typename Triangulation_3>
-class Surface_mesh_placeholder {
-
-};
-
-// template <typename SurfaceMesh>
-// class Surface_mesh_wrapper {
-//     using Face_descriptor = std::size_t;
-//     using Normal_3 = Eigen::Vector3d;
-//     std::size_t nb_faces() const { return 0; }
-//     std::vector<Face_descriptor> face_range() const { return {}; }
-//     std::size_t nb_face_vertices(Face_descriptor face) const { return 0; }
-//     unsigned surface_id(Face_descriptor) const { return 0; }
-//     std::vector<Vertex_descriptor> face_vertices(Face_descriptor face) const { return {}; }
-    
-//     SurfaceMesh const &sm;
-// };
-
 template <typename C3T3>
 class C3T3_wrapper {
-    using Cell_descriptor = std::size_t;
-    using Vertex_descriptor = std::size_t;
-    using Face_descriptor = std::size_t;
-    using Edge_descriptor = std::size_t;
-    using Normal_3 = Eigen::Vector3d;
-    using Point_3 = Eigen::Vector3d;
+public:
+    using Cell_descriptor = C3T3::Cell_handle;
+    using Vertex_descriptor = C3T3::Vertex_handle;
+    using Face_descriptor = C3T3::Facet;
+    using Edge_descriptor = C3T3::Edge;
+    using Normal_3 = C3T3::Triangulation::Geom_traits::Vector_3;
+    using Point_3 = C3T3::Triangulation::Geom_traits::Point_3;
 
-    std::size_t nb_cells() const { return 0; }
-    std::size_t nb_edges() const { return 0; }
-    std::size_t nb_faces() const { return 0; }
-    std::size_t nb_vertices() const { return 0; }
+    std::size_t nb_cells() const { return c3t3.number_of_cells(); }
+    std::size_t nb_faces() const { return c3t3.number_of_edges(); }
+    std::size_t nb_edges() const { return c3t3.number_of_facets(); }
+    std::size_t nb_vertices() const { return c3t3.triangulation().number_of_vertices(); }
 
-    Point_3 vertex_coordinates(Vertex_descriptor vertex) const { return {0.,0.,0.}; }
-    void set_new_vertex_coordinates(Vertex_descriptor vertex, Point_3 coord) {} 
-    std::vector<Cell_descriptor> cell_range() const { return {}; } 
-    std::array<Vertex_descriptor, 4> cell_vertices(Cell_descriptor cell) const { return {0,0,0,0}; } 
+    Point_3 vertex_coordinates(Vertex_descriptor vertex) const { return vertex->point(); }
+    void set_new_vertex_coordinates(Vertex_descriptor vertex, Point_3 coord) { vertex->set_point(coord); } 
+    auto cell_range() const { return c3t3.cells_in_complex(); } 
+    std::array<Vertex_descriptor, 4> cell_vertices(Cell_descriptor cell) const { 
+        std::array<Vertex_descriptor, 4> vertices;
+        for (int i = 0; i < 4; ++i) {
+            vertices[static_cast<unsigned>(i)] = cell->vertex(i);
+        }
+        return vertices;
+    } 
     std::array<Point_3, 4> cell_reference_shape(Cell_descriptor cell) const {
         return Shapes::VTK_TETRAHEDRON<Point_3>();
     }
 
-    std::vector<Face_descriptor> face_range() const { return {}; }
-    std::size_t nb_face_vertices(Face_descriptor face) const { return 0; }
-    unsigned surface_id(Face_descriptor) const { return 0; }
-    std::vector<Vertex_descriptor> face_vertices(Face_descriptor face) const { return {}; }
+    auto face_range() const { return c3t3.facets_in_complex(); }
+    std::size_t nb_face_vertices(Face_descriptor face) const { return 3; }
+    unsigned surface_id(Face_descriptor) const { return 0; } // todo: find a better value
+    std::vector<Vertex_descriptor> face_vertices(Face_descriptor face) const { 
+        std::vector<Vertex_descriptor> vertices(3);
+        for (int i = 0; i < 3; ++i) {
+            vertices[static_cast<unsigned>(i)] = face->vertex(i);
+        }
+        return vertices;
+    }
 
-    std::vector<Edge_descriptor> edge_range() const { return {}; }
-    unsigned curve_id(Edge_descriptor) const { return 0; }
-    Vertex_descriptor edge_vertex(Edge_descriptor edge, unsigned i) const { return Vertex_descriptor(); }
+    auto edge_range() const { return c3t3.edges_in_complex(); }
+    unsigned curve_id(Edge_descriptor) const { return 0; } // todo: find a better value
+    Vertex_descriptor edge_vertex(Edge_descriptor edge, unsigned i) const { return edge->vertex(i); }
 
     C3T3 &c3t3;
 };
