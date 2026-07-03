@@ -18,8 +18,7 @@
 #include <Mesh_optimization/Mesh_optimization.h>
 
 
-// todo: 
-// - fix point compilation
+// todo:
 // - set up the right data for the C3T3
 // - do surface projection for the facets of the c3t3 with BVH queries
 // - do curve projection for the edges of the c3t3 with BVH queries
@@ -57,9 +56,9 @@ namespace params = CGAL::parameters;
 CGAL::Image_3 create_cgal_image(const std::size_t& xdim, const std::size_t& ydim, const std::size_t& zdim,
                                 double vx = 1.0, double vy = 1.0, double vz = 1.0)
 {
-    _image* im = _createImage(xdim, ydim, zdim, 1,
-                              vx, vy, vz, 1,
-                              WK_FIXED, SGN_UNSIGNED);
+    CGAL::_image* im = _createImage(xdim, ydim, zdim, 1,
+                                    vx, vy, vz, 1,
+                                    CGAL::WK_FIXED, CGAL::SGN_UNSIGNED);
     std::fill_n(static_cast<unsigned char*>(im->data), xdim*ydim*zdim, 0);
     return CGAL::Image_3(im);
 }
@@ -70,7 +69,7 @@ void add_rectangle_in_image(const K::Point_3& rectangle_min, // [0..1]^3
                             CGAL::Image_3 &image)
 {
     using CGAL::IMAGEIO::static_evaluate;
-    _image* im = image.image();
+    CGAL::_image* im = image.image();
     const std::size_t min_x = rectangle_min.x() * im->xdim;
     const std::size_t min_y = rectangle_min.y() * im->ydim;
     const std::size_t min_z = rectangle_min.z() * im->zdim;
