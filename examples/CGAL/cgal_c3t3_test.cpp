@@ -17,6 +17,14 @@
 
 #include <Mesh_optimization/Mesh_optimization.h>
 
+
+// todo: 
+// - fix point compilation
+// - set up the right data for the C3T3
+// - do surface projection for the facets of the c3t3 with BVH queries
+// - do curve projection for the edges of the c3t3 with BVH queries
+// for the previous things, we should reproject on a copy of c3t3 to keep the given boundary
+
 // Parallel tag
 #ifdef CGAL_CONCURRENT_MESH_3
 typedef CGAL::Parallel_tag Concurrency_tag;
