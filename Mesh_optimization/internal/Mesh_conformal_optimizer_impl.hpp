@@ -176,6 +176,12 @@ bool Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::is_ve
 }
 
 template<typename TetrahedralMesh, typename BoundaryMesh, typename EdgeNetwork>
+void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::set_update_validator(Update_validator func) {
+    _update_validator = func;
+}
+
+
+template<typename TetrahedralMesh, typename BoundaryMesh, typename EdgeNetwork>
 void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::check_refs() {
     // when is it that the input tetrahedra is wrong, or is it just tangled?
     // bool input_contains_invalid_references = false;
@@ -217,6 +223,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::clear
     _callback_vertex_map_data.clear();
     _callback_cell_map_data.clear();
 
+    _current_coords_to_check.clear();
 }
 
 template<typename TetrahedralMesh, typename BoundaryMesh, typename EdgeNetwork>
@@ -231,13 +238,13 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::creat
     _compressed_locks.reserve(3*_mesh.nb_vertices());
     temp_coordinates_storage.reserve(3*_mesh.nb_vertices());
 
-    auto get_compressed_point_id = [&](Vertex_descriptor Vertex_descriptor) {
-        auto res = _vertex_original_to_compressed.emplace(Vertex_descriptor, nb_points);
+    auto get_compressed_point_id = [&](Vertex_descriptor vertex_descriptor) {
+        auto res = _vertex_original_to_compressed.emplace(vertex_descriptor, nb_points);
         if (res.second) {
             ++nb_points;
             nb_tet_on_verts.push_back(0);
-            Point_3 coordinates = _mesh.vertex_coordinates(Vertex_descriptor);
-            auto iterator = _user_locks.find(Vertex_descriptor);
+            Point_3 coordinates = _mesh.vertex_coordinates(vertex_descriptor);
+            auto iterator = _user_locks.find(vertex_descriptor);
             for (unsigned i = 0; i < 3; ++i) {
                 temp_coordinates_storage.push_back(coordinates[i]);
                 _compressed_locks.push_back(iterator == _user_locks.end() ? false : (*iterator).second[i]);
@@ -289,6 +296,13 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::creat
     }
     initialize_boundary();
     initialize_curve_network();
+
+    if (_update_validator != nullptr) {
+        _current_coords_to_check.reserve(_mesh.nb_vertices());
+        for (auto [v, id] : _vertex_original_to_compressed) {
+            _current_coords_to_check.emplace(v, _mesh.vertex_coordinates(v));
+        }
+    }
 }
 
 template<typename TetrahedralMesh, typename BoundaryMesh, typename EdgeNetwork>
@@ -391,7 +405,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::resca
 template<typename TetrahedralMesh, typename BoundaryMesh, typename EdgeNetwork>
 void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::update_mesh_coordinates() {
     for (auto [vertex_descriptor, compressed_id] : _vertex_original_to_compressed) {
-        Eigen::Vector3d pt =Mesh_optimization_internal::Math_functions::sub_col_vector(_compressed_coords, compressed_id);
+        Eigen::Vector3d pt = Mesh_optimization_internal::Math_functions::sub_col_vector(_compressed_coords, compressed_id);
         _mesh.set_new_vertex_coordinates(vertex_descriptor, convert_to_user(pt));
     }
 }
@@ -692,6 +706,18 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
             {
                 return run_callback(status, vertex_data, cell_data);
             };
+    }
+
+    if (_update_validator != nullptr) {
+        optimizer.set_validation_query(
+            [&](Eigen::VectorXd const &coords) {
+                for (auto &[v, pt]: _current_coords_to_check) {
+                    Eigen::Vector3d live_pt = Mesh_optimization_internal::Math_functions::sub_col_vector(_compressed_coords, _vertex_original_to_compressed.at(v));
+                    pt = convert_to_user(live_pt);
+                }
+                return _update_validator(_current_coords_to_check);
+            }
+        );
     }
 
     optimizer.exact_predicate_status = _predicates_mode > Parameters::NO_CHECK;

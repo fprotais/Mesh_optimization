@@ -72,6 +72,11 @@ public:
     void set_target_sizing(Size_query query); // todo: implement and use. 
     void set_target_sizing(Size_batch_query query);
 
+    using Validation_query = std::function<double (Eigen::VectorXd const &coords)>;
+
+    void set_validation_query(Validation_query query);
+    
+
     unsigned max_lbfgs_iter = 500;
 
     void set_starting_untangling_epsilon(double eps) { start_untangle_eps = eps; };
@@ -216,6 +221,8 @@ private:
     double _predicate_infinite_energy = 1e100;
 
     void gather_energy_gradient(Eigen::VectorXd &g) const;
+
+    Validation_query _validation_query = nullptr;
 private:
     // untangling / smoothing
     void update_untangling_eps(double decrease_rate);
@@ -232,6 +239,9 @@ private:
         if (exact_predicate_linesearch_enforcement) {
             unsigned nb_invalid = evaluate_exact_predicates(&x);
             if (nb_invalid != 0) return _predicate_infinite_energy;
+        }
+        if (_validation_query != nullptr) {
+            if (!_validation_query(x)) return _predicate_infinite_energy;
         }
         return power_mips_untangling_energy(x, g);
     }
@@ -450,6 +460,10 @@ inline void Tetrahedral_conformal_optimizer::set_quadratic_target_positions(
 {
     _point_prev_target_weight.resize(targets.size());
     _point_target_position = targets;
+}
+
+inline void Tetrahedral_conformal_optimizer::set_validation_query(Validation_query query) {
+    _validation_query = query;
 }
 
 inline Eigen::Matrix3d Tetrahedral_conformal_optimizer::Tet_storage::compute_jacobian(Eigen::VectorXd const &coords) const {

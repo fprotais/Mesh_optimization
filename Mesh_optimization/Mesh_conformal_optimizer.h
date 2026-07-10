@@ -366,6 +366,13 @@ public: // for advanced usage. Do not touch if you do not know what you are doin
     // only when CHECK_IN_LBFGS is enabled. 
     unsigned get_number_of_invalid_steps_measured_by_predicates() const;
 
+    // user callback to enforce "infinite" energy for given coordinates changes
+    // It can be used to have particular guarantees to preserve
+    // but I do not recommend to rely on it, it is likely to block the optimization all together
+    using Update_validator = std::function<bool (Vertex_descriptor_map<Point_3> const &coords)>;
+
+    void set_update_validator(Update_validator func);
+
 public: // for advanced monitoring
 
     using Iteration_status = Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Iteration_status;
@@ -461,8 +468,12 @@ private:
 
 
     QUERY_TYPE _target_size_query_type = NONE;
-    Point_target_sizing_query _target_size_query; 
-    Point_target_sizing_batch_query _target_size_batch_query; 
+    Point_target_sizing_query _target_size_query = nullptr; 
+    Point_target_sizing_batch_query _target_size_batch_query = nullptr;
+
+    Update_validator _update_validator = nullptr;
+    Vertex_descriptor_map<Point_3> _current_coords_to_check;
+
 
     double _scale = 1.;
     Eigen::Vector3d _shift = Eigen::Vector3d::Zero();
