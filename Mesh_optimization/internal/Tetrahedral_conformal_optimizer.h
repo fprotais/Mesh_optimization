@@ -1152,14 +1152,17 @@ inline void Tetrahedral_conformal_optimizer::update_curves_and_points_info(Eigen
         edge.A = weight * (Eigen::Matrix3d::Identity() - n * n.transpose());
         edge.pt = pt;
 
-        double max_edge_relative_dist = 0.;
-        for (unsigned v : edge.verts) {
-            Eigen::Vector3d dir = edge.pt - Math_functions::sub_col_vector(x, v);
-            double dist = dir.transpose() * edge.A * dir;
-            dist /= _local_size[v]*_local_size[v];
-            max_edge_relative_dist = (std::max)(max_edge_relative_dist, dist);
+        if (reset)  {
+            double max_edge_relative_dist = 0.;
+            for (unsigned v : edge.verts) {
+                Eigen::Vector3d dir = edge.pt - Math_functions::sub_col_vector(x, v);
+                double dist = dir.transpose() * edge.A * dir;
+                dist /= _local_size[v]*_local_size[v];
+                max_edge_relative_dist = (std::max)(max_edge_relative_dist, dist);
+            }
+            edge.weight = 1./(std::max)(MAXIMUM_RELATIVE_DISTANCE_RE_WEIGHTING,max_edge_relative_dist);
         }
-        if (reset) edge.weight = 1./(std::max)(MAXIMUM_RELATIVE_DISTANCE_RE_WEIGHTING,max_edge_relative_dist);
+
     }
 
     for (unsigned i = 0; i < _point_target_position.size(); ++i) {
