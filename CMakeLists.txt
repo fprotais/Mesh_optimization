@@ -29,7 +29,26 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 include(FetchContent)
 
-add_subdirectory(examples)
+# Export a header-only interface target so FetchContent users can link to it.
+add_library(Mesh_optimization INTERFACE)
+target_include_directories(Mesh_optimization
+    INTERFACE
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+)
+
+# Make examples optional so this project is FetchContent-friendly.
+# If this CMakeLists is the top-level project, enable examples by default.
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  option(BUILD_EXAMPLES "Build examples" ON)
+else()
+  option(BUILD_EXAMPLES "Build examples" OFF)
+endif()
+
+if (BUILD_EXAMPLES)
+  add_subdirectory(examples)
+else()
+  message(STATUS "Examples are disabled (BUILD_EXAMPLES=OFF).")
+endif()
 
 option(BUILD_SANDBOX "Build sandbox" OFF)
 if (BUILD_SANDBOX)
