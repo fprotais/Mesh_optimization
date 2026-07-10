@@ -15,19 +15,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 find_package(Eigen3 3.3.0 QUIET REQUIRED)
 
-find_package(OpenMP COMPONENTS CXX)
-if(OpenMP_CXX_FOUND)
-  message(STATUS "OpenMP found")
-  if(MSVC)
-    # Override the compile options for the imported OpenMP target
-    set_target_properties(OpenMP::OpenMP_CXX PROPERTIES
-                          INTERFACE_COMPILE_OPTIONS "/openmp:llvm")
-  endif()
-endif()
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
-include(FetchContent)
 
 # Export a header-only interface target so FetchContent users can link to it.
 add_library(Mesh_optimization INTERFACE)
@@ -35,6 +22,28 @@ target_include_directories(Mesh_optimization
     INTERFACE
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
+target_link_libraries(Mesh_optimization INTERFACE Eigen3::Eigen)
+
+## Use OpenMP when available. 
+option(USE_OPENMP "Enable OpenMP support" ON)
+
+if (USE_OPENMP)
+  find_package(OpenMP COMPONENTS CXX)
+  if(OpenMP_CXX_FOUND)
+    message(STATUS "OpenMP found")
+    if(MSVC)
+      # Override the compile options for the imported OpenMP target
+      set_target_properties(OpenMP::OpenMP_CXX PROPERTIES
+                            INTERFACE_COMPILE_OPTIONS "/openmp:llvm")
+    endif()
+    target_link_libraries(Mesh_optimization INTERFACE OpenMP::OpenMP_CXX)
+  else()
+    message(STATUS "OpenMP requested but not found.")
+  endif()
+endif()
+
+
+include(FetchContent)
 
 # Make examples optional so this project is FetchContent-friendly.
 # If this CMakeLists is the top-level project, enable examples by default.

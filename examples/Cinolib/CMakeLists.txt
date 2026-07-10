@@ -11,8 +11,4 @@ find_package(cinolib REQUIRED)
 
 
 add_executable(cinolib_smooth cinolib_smooth.cpp)
-target_link_libraries(cinolib_smooth PRIVATE Eigen3::Eigen cinolib)
-
-if( OpenMP_CXX_FOUND )
-    target_link_libraries(cinolib_smooth PRIVATE OpenMP::OpenMP_CXX)
-endif()
+target_link_libraries(cinolib_smooth PRIVATE Mesh_optimization cinolib)

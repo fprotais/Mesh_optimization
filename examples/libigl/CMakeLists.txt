@@ -6,8 +6,5 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(libigl)
 
 add_executable(libigl_handle_deformation libigl_handle_deformation.cpp)
-target_link_libraries(libigl_handle_deformation PRIVATE Eigen3::Eigen igl::core)
-if( OpenMP_CXX_FOUND )
-    target_link_libraries(libigl_handle_deformation PRIVATE OpenMP::OpenMP_CXX)
-endif()
+target_link_libraries(libigl_handle_deformation PRIVATE Mesh_optimization igl::core)
 
