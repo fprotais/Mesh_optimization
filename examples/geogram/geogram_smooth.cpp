@@ -77,11 +77,12 @@ class Boundary_wrapper {
 public:
     using Face_descriptor = GEO::index_t;
     using Normal_3 = GEO::vec3;
+    using Surface_patch_index = GEO::index_t;
     unsigned nb_faces() const { return mesh.facets.nb(); }
 
     GEO::index_range face_range() const { return GEO::index_range{mesh.facets.begin(), mesh.facets.end()}; }
 
-    unsigned surface_id(Face_descriptor f) const { return f; }
+    unsigned patch_id(Face_descriptor f) const { return f; }
     unsigned nb_face_vertices(Face_descriptor face) const { return mesh.facets.nb_vertices(face); }
     auto face_vertices(Face_descriptor face) const { return mesh.facets.vertices(face); }
 public:

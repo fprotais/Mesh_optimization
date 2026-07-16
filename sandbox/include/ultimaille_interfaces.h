@@ -77,11 +77,12 @@ namespace UM_extension {
     public:
         using Face_descriptor = int;
         using Normal_3 = UM::vec3;
+        using Surface_patch_index = unsigned;
         unsigned nb_faces() const { return trimesh.nfacets(); }
         Contiguous_unsigned_range face_range() const {
             return Contiguous_unsigned_range{0, nb_faces()};
         }
-        unsigned surface_id(Face_descriptor f) const { return f; }
+        unsigned patch_id(Face_descriptor f) const { return f; }
         unsigned nb_face_vertices(Face_descriptor face) const { return 3; }
         auto face_vertices(Face_descriptor face) const { return std::array<int, 3>{trimesh.vert(face, 0), trimesh.vert(face, 1), trimesh.vert(face, 2)}; }
 
@@ -92,6 +93,7 @@ namespace UM_extension {
     class PolyLine_wrapper {
     public:
         using Edge_descriptor = int;
+        using Curve_index = unsigned;
         unsigned nb_edges() const { return segments.nedges(); }
         Contiguous_unsigned_range edge_range() const {
             return Contiguous_unsigned_range{0, nb_edges()};
@@ -139,11 +141,12 @@ namespace UM_extension {
     public:
         using Face_descriptor = int;
         using Normal_3 = UM::vec3;
+        using Surface_patch_index = unsigned;
         unsigned nb_faces() const { return quadmesh.nfacets(); }
         Contiguous_unsigned_range face_range() const {
             return Contiguous_unsigned_range{0, nb_faces()};
         }
-        unsigned surface_id(Face_descriptor f) const { return f; }
+        unsigned patch_id(Face_descriptor f) const { return f; }
         unsigned nb_face_vertices(Face_descriptor face) const { return 4; }
         auto face_vertices(Face_descriptor face) const { return std::array<int, 4>{quadmesh.vert(face, 0), quadmesh.vert(face, 1), quadmesh.vert(face, 2), quadmesh.vert(face, 3)}; }
 

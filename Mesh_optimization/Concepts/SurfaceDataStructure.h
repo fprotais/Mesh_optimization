@@ -25,6 +25,11 @@ Vector type.
 */
 using Normal_3 = unspecified_type;
 
+/*!
+Index associated with a surface patch to identify the patch it belongs to. This is used to query the patch information from the user.
+*/
+using Surface_patch_index = unspecified_type;
+
 /// @}
 
 /// \name Operations
@@ -49,7 +54,7 @@ std::size_t nb_face_vertices(Face_descriptor face) const;
 /*!
 Returns an identifier (patch id, face id, ...) related to the given face.
 */
-unsigned surface_id(Face_descriptor face) const;
+Surface_patch_index patch_id(Face_descriptor face) const;
 
 /*!
 Provides an iterable range of Vertex_descriptor as defined in `MeshDataStructure` to iterate over the vertices of a face. 

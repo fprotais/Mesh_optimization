@@ -97,11 +97,12 @@ class Boundary_wrapper {
 public:
     using Face_descriptor = int;
     using Normal_3 = UM::vec3;
+    using Surface_patch_index = unsigned;
     unsigned nb_faces() const { return mesh.nfacets(); }
 
     UM_extension::Contiguous_unsigned_range face_range() const { return UM_extension::Contiguous_unsigned_range{0, size_t(mesh.nfacets())}; }
 
-    unsigned surface_id(Face_descriptor f) const { return f; }
+    unsigned patch_id(Face_descriptor f) const { return f; }
     unsigned nb_face_vertices(Face_descriptor face) const { return mesh.facet(face).size(); }
     auto face_vertices(Face_descriptor face) const { 
         std::vector<int> vertices(mesh.facet(face).size());
@@ -116,6 +117,8 @@ public:
 
 class Edge_network {
 public:
+    using Edge_descriptor = int;
+    using Curve_index = unsigned;
     size_t nb_edges() const { return (size_t)selected_edges.nedges(); }
     UM_extension::Contiguous_unsigned_range edge_range() const { return UM_extension::Contiguous_unsigned_range{0, nb_edges()}; }
     unsigned curve_id(int e) const { return (unsigned)e; }

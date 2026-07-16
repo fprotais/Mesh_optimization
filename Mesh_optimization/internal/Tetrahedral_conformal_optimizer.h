@@ -10,6 +10,7 @@
 
 namespace Mesh_optimization_internal {
 
+template<typename Surface_patch_index, typename Curve_index>
 class Tetrahedral_conformal_optimizer {
 public:
     Tetrahedral_conformal_optimizer(
@@ -21,14 +22,14 @@ public:
     );
 
     using Plane = std::tuple<Eigen::Vector3d, Eigen::Vector3d, double>; // point, normal, weight
-    using Boundary_query = std::function<Plane (std::vector<Eigen::Vector3d> const &poly, unsigned surface_id)>;
-    using Boundary_batch_query = std::function<void (std::vector<std::vector<Eigen::Vector3d>> const &polys, std::vector<unsigned> surface_id, std::vector<Plane> &results)>;
+    using Boundary_query = std::function<Plane (std::vector<Eigen::Vector3d> const &poly, Surface_patch_index surface_id)>;
+    using Boundary_batch_query = std::function<void (std::vector<std::vector<Eigen::Vector3d>> const &polys, std::vector<Surface_patch_index> const &surface_id, std::vector<Plane> &results)>;
 
 
     void set_boundary_without_query(
         std::vector<std::vector<unsigned>> const &bnd_faces,
         std::vector<std::pair<unsigned, std::vector<std::array<unsigned, 2>>>> const *vert_and_face_corners, // pointer to highlight that the code keeps but not copy
-        std::vector<unsigned> const &face_ids = {}
+        std::vector<Surface_patch_index> const &face_ids 
     );
 
 
@@ -36,30 +37,30 @@ public:
         std::vector<std::vector<unsigned>> const &bnd_faces,
         std::vector<std::pair<unsigned, std::vector<std::array<unsigned, 2>>>> const *vert_and_face_corners, // pointer to highlight that the code keeps but not copy
         Boundary_query boundary_query,
-        std::vector<unsigned> const &face_ids
+        std::vector<Surface_patch_index> const &face_ids
     );
 
     void set_boundary_with_batch_query(
         std::vector<std::vector<unsigned>> const &bnd_faces,
         std::vector<std::pair<unsigned, std::vector<std::array<unsigned, 2>>>> const *vert_and_face_corners, // pointer to highlight that the code keeps but not copy
         Boundary_batch_query boundary_query,
-        std::vector<unsigned> const &face_ids
+        std::vector<Surface_patch_index> const &face_ids
     );
 
 
     using Curve_tangent = std::tuple<Eigen::Vector3d, Eigen::Vector3d, double>; // point, normal, weight
 
-    using Curve_query = std::function<Curve_tangent (std::array<Eigen::Vector3d, 2> const &edge, unsigned curve_id)>;
-    using Curve_batch_query = std::function<void (std::vector<std::array<Eigen::Vector3d, 2>> const &edges, std::vector<unsigned> curve_ids, std::vector<Curve_tangent> &results)>;
+    using Curve_query = std::function<Curve_tangent (std::array<Eigen::Vector3d, 2> const &edge, Curve_index curve_id)>;
+    using Curve_batch_query = std::function<void (std::vector<std::array<Eigen::Vector3d, 2>> const &edges, std::vector<Curve_index> const &curve_ids, std::vector<Curve_tangent> &results)>;
     void set_curve_network_with_singular_query(
         std::vector<std::array<unsigned, 2>> const &edges,
-        std::vector<unsigned> const &edge_ids,
+        std::vector<Curve_index> const &edge_ids,
         Curve_query query
     );
 
     void set_curve_network_with_batch_query(
         std::vector<std::array<unsigned, 2>> const &edges,
-        std::vector<unsigned> const &edge_ids,
+        std::vector<Curve_index> const &edge_ids,
         Curve_batch_query query
     );
 
@@ -262,7 +263,7 @@ private:
 private:
     // boundary
     struct Boundary_poly {
-        Boundary_poly(unsigned size, unsigned id = 0)
+        Boundary_poly(unsigned size, Surface_patch_index id)
         : verts(size)
         , surface_id(id)
         , vert_grad(size, Eigen::Vector3d::Zero())
@@ -270,7 +271,7 @@ private:
 
         // input
         std::vector<unsigned> verts;
-        unsigned surface_id;
+        Surface_patch_index surface_id;
 
         Eigen::Matrix3d A = Eigen::Matrix3d::Zero();
         Eigen::Vector3d pt = Eigen::Vector3d::Zero();
@@ -293,7 +294,7 @@ private:
     Boundary_batch_query _boundary_batch_query = nullptr;
     bool _boundary_batch_mode = false;
     std::vector<std::vector<Eigen::Vector3d>> _boundary_live_coords;
-    std::vector<unsigned> _boundary_batch_ids;
+    std::vector<Surface_patch_index> _boundary_batch_ids;
     std::vector<Plane> _boundary_batch_query_results;
 
     bool has_bnd_terms() const;
@@ -305,12 +306,12 @@ private:
     // curve and target positions
 
     struct Edge_data {
-        Edge_data(std::array<unsigned, 2> verts_ = {0,0}, unsigned curve_id_ = 0)
+        Edge_data(std::array<unsigned, 2> verts_, Curve_index curve_id_)
         : verts(verts_)
         , curve_id(curve_id_)
         {}
         std::array<unsigned, 2> verts;
-        unsigned curve_id;
+        Curve_index curve_id;
 
         Eigen::Matrix3d A = Eigen::Matrix3d::Zero();
         Eigen::Vector3d pt = Eigen::Vector3d::Zero();
@@ -325,7 +326,7 @@ private:
     Curve_batch_query _curve_batch_query = nullptr;
     bool _curve_batch_mode = false;
     std::vector<std::array<Eigen::Vector3d, 2>> _edge_live_coords;
-    std::vector<unsigned> _edge_batch_ids;
+    std::vector<Curve_index> _edge_batch_ids;
     std::vector<Curve_tangent> _edge_batch_query_results;
 
     std::vector<double> _point_prev_target_weight;
@@ -348,8 +349,8 @@ private:
 
 namespace Mesh_optimization_internal {
 
-
-inline Tetrahedral_conformal_optimizer::Tetrahedral_conformal_optimizer(
+template<typename Surface_patch_index, typename Curve_index>
+inline Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::Tetrahedral_conformal_optimizer(
     Eigen::VectorXd &coords,
     std::vector<bool> const &locks,
     std::vector<std::array<unsigned, 4>> const &tetrahedra,
@@ -372,10 +373,11 @@ inline Tetrahedral_conformal_optimizer::Tetrahedral_conformal_optimizer(
     compute_determinants();
 }
 
-inline void Tetrahedral_conformal_optimizer::set_boundary_without_query(
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::set_boundary_without_query(
     std::vector<std::vector<unsigned>> const &bnd_faces,
     std::vector<std::pair<unsigned, std::vector<std::array<unsigned, 2>>>> const *vert_and_face_corners,
-    std::vector<unsigned> const &ids
+    std::vector<Surface_patch_index> const &ids
 )
 {
     _vert_and_face_corners = vert_and_face_corners;
@@ -387,9 +389,10 @@ inline void Tetrahedral_conformal_optimizer::set_boundary_without_query(
     _boundary_batch_ids.reserve(bnd_faces.size());
     _boundary_batch_query_results.clear();
     _boundary_batch_query_results.reserve(bnd_faces.size());
+    assert(ids.size() == bnd_faces.size());
     for (unsigned f = 0; f < bnd_faces.size(); ++f) {
         if (bnd_faces[f].empty()) continue;
-        _bnd_poly.push_back(Boundary_poly(static_cast<unsigned>(bnd_faces[f].size()), ids.size() == bnd_faces.size() ? ids[f] : 0));
+        _bnd_poly.push_back(Boundary_poly(static_cast<unsigned>(bnd_faces[f].size()), ids[f]));
         _bnd_poly.back().verts = bnd_faces[f];
         _boundary_live_coords.push_back(std::vector<Eigen::Vector3d>(bnd_faces[f].size()));
         _boundary_batch_ids.push_back(ids[f]);
@@ -397,11 +400,12 @@ inline void Tetrahedral_conformal_optimizer::set_boundary_without_query(
 }
 
 
-inline void Tetrahedral_conformal_optimizer::set_boundary_with_singular_query(
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::set_boundary_with_singular_query(
     std::vector<std::vector<unsigned>> const &bnd_faces,
     std::vector<std::pair<unsigned, std::vector<std::array<unsigned, 2>>>> const *vert_and_face_corners,
     Boundary_query boundary_query,
-    std::vector<unsigned> const &ids
+    std::vector<Surface_patch_index> const &ids
 )
 {
     set_boundary_without_query(bnd_faces, vert_and_face_corners, ids);
@@ -409,11 +413,12 @@ inline void Tetrahedral_conformal_optimizer::set_boundary_with_singular_query(
     _boundary_query = boundary_query;
 }
 
-inline void Tetrahedral_conformal_optimizer::set_boundary_with_batch_query(
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::set_boundary_with_batch_query(
     std::vector<std::vector<unsigned>> const &bnd_faces,
     std::vector<std::pair<unsigned, std::vector<std::array<unsigned, 2>>>> const *vert_and_face_corners,
     Boundary_batch_query boundary_query,
-    std::vector<unsigned> const &ids
+    std::vector<Surface_patch_index> const &ids
 )
 {
     set_boundary_without_query(bnd_faces, vert_and_face_corners, ids);
@@ -421,40 +426,43 @@ inline void Tetrahedral_conformal_optimizer::set_boundary_with_batch_query(
     _boundary_batch_query = boundary_query;
 }
 
-inline void Tetrahedral_conformal_optimizer::set_curve_network_with_singular_query(
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::set_curve_network_with_singular_query(
         std::vector<std::array<unsigned, 2>> const &edges,
-        std::vector<unsigned> const &edge_ids,
+        std::vector<Curve_index> const &edge_ids,
         Curve_query query
 )
 {
     assert(edges.size() == edge_ids.size());
-    _edge_data.resize(edges.size());
+    _edge_data.reserve(edges.size());
     for (unsigned i = 0; i < edges.size(); ++i) {
-        _edge_data[i] = Edge_data(edges[i], edge_ids[i]);
+        _edge_data.push_back(Edge_data(edges[i], edge_ids[i]));
     }
-    _boundary_batch_mode = false;
+    _curve_batch_mode = false;
     _curve_query = query;
 }
 
-inline void Tetrahedral_conformal_optimizer::set_curve_network_with_batch_query(
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::set_curve_network_with_batch_query(
         std::vector<std::array<unsigned, 2>> const &edges,
-        std::vector<unsigned> const &edge_ids,
+        std::vector<Curve_index> const &edge_ids,
         Curve_batch_query query
 )
 {
     assert(edges.size() == edge_ids.size());
-    _edge_data.resize(edges.size());
+    _edge_data.reserve(edges.size());
     for (unsigned i = 0; i < edges.size(); ++i) {
-        _edge_data[i] = Edge_data(edges[i], edge_ids[i]);
+        _edge_data.push_back(Edge_data(edges[i], edge_ids[i]));
     }
-    _boundary_batch_mode = true;
+    _curve_batch_mode = true;
     _curve_batch_query = query;
     _edge_live_coords.resize(edges.size());
     _edge_batch_ids = edge_ids;
     _edge_batch_query_results.resize(edges.size());
 }
 
-inline void Tetrahedral_conformal_optimizer::set_quadratic_target_positions(
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::set_quadratic_target_positions(
         std::vector<std::tuple<unsigned, Eigen::Vector3d, double>> const &targets
 )
 {
@@ -462,11 +470,13 @@ inline void Tetrahedral_conformal_optimizer::set_quadratic_target_positions(
     _point_target_position = targets;
 }
 
-inline void Tetrahedral_conformal_optimizer::set_validation_query(Validation_query query) {
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::set_validation_query(Validation_query query) {
     _validation_query = query;
 }
 
-inline Eigen::Matrix3d Tetrahedral_conformal_optimizer::Tet_storage::compute_jacobian(Eigen::VectorXd const &coords) const {
+template<typename Surface_patch_index, typename Curve_index>
+inline Eigen::Matrix3d Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::Tet_storage::compute_jacobian(Eigen::VectorXd const &coords) const {
         return    ig[0] * Math_functions::sub_line_vector(coords,verts[0])
                 + ig[1] * Math_functions::sub_line_vector(coords,verts[1])
                 + ig[2] * Math_functions::sub_line_vector(coords,verts[2])
@@ -474,7 +484,8 @@ inline Eigen::Matrix3d Tetrahedral_conformal_optimizer::Tet_storage::compute_jac
 }
 
 
-inline void Tetrahedral_conformal_optimizer::compute_determinants()
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::compute_determinants()
 {
     double det_min = (std::numeric_limits<double>::max)();
     unsigned nb_inverted = 0;
@@ -511,7 +522,8 @@ inline void Tetrahedral_conformal_optimizer::compute_determinants()
     _collapsed_area_detected = collapsed_area_detected;
 }
 
-Eigen::SparseMatrix<double> Tetrahedral_conformal_optimizer::compute_diffusion_matrix(double w, bool graph) {
+template<typename Surface_patch_index, typename Curve_index>
+Eigen::SparseMatrix<double> Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::compute_diffusion_matrix(double w, bool graph) {
     unsigned n = 3 * nb_vertices();
     double l = w / (1+w);
 
@@ -581,7 +593,8 @@ Eigen::SparseMatrix<double> Tetrahedral_conformal_optimizer::compute_diffusion_m
 }
 
 
-inline void Tetrahedral_conformal_optimizer::update_local_size() {
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::update_local_size() {
 #pragma omp parallel for
     for (int iter_v = 0; iter_v < static_cast<int>(_vert2tet_corner.size());++iter_v) {
         unsigned v = static_cast<unsigned>(iter_v);
@@ -614,7 +627,8 @@ inline void Tetrahedral_conformal_optimizer::update_local_size() {
     }
 }
 
-unsigned Tetrahedral_conformal_optimizer::evaluate_exact_predicates(Eigen::VectorXd const *x) {
+template<typename Surface_patch_index, typename Curve_index>
+unsigned Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::evaluate_exact_predicates(Eigen::VectorXd const *x) {
     unsigned invalid_tet = 0;
 
     Eigen::VectorXd const & coords = x == nullptr ? _coords : *x;
@@ -637,7 +651,8 @@ unsigned Tetrahedral_conformal_optimizer::evaluate_exact_predicates(Eigen::Vecto
 }
 
 
-bool Tetrahedral_conformal_optimizer::run_callback(OPTIMIZATION_TYPE opt_type, unsigned iter, LBFGS_status lbfgs_status, Eigen::VectorXd const *g) {
+template<typename Surface_patch_index, typename Curve_index>
+bool Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::run_callback(OPTIMIZATION_TYPE opt_type, unsigned iter, LBFGS_status lbfgs_status, Eigen::VectorXd const *g) {
     if (callback_function == nullptr) return false;
     if (callback_setting == DEBUG_CALLBACK_SETTING::NOTHING) return false;
     if (callback_setting == DEBUG_CALLBACK_SETTING::OUTER_ITER && lbfgs_status.enabled()) return false;
@@ -689,7 +704,8 @@ bool Tetrahedral_conformal_optimizer::run_callback(OPTIMIZATION_TYPE opt_type, u
 }
 
 
-void Tetrahedral_conformal_optimizer::gather_energy_gradient(Eigen::VectorXd &g) const {
+template<typename Surface_patch_index, typename Curve_index>
+void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::gather_energy_gradient(Eigen::VectorXd &g) const {
 #pragma omp parallel for
     for (int iter_v = 0; iter_v < static_cast<int>(_vert2tet_corner.size());++iter_v) {
         unsigned v = static_cast<unsigned>(iter_v);
@@ -703,7 +719,8 @@ void Tetrahedral_conformal_optimizer::gather_energy_gradient(Eigen::VectorXd &g)
 }
 
 
-inline void Tetrahedral_conformal_optimizer::update_untangling_eps(double decrease_rate) {
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::update_untangling_eps(double decrease_rate) {
     // mix of foldover and 1999 epsilons.
     if (_det_min > 0) {
         _untangling_eps = _NO_UNTANGLING_EPS;
@@ -735,7 +752,8 @@ inline void Tetrahedral_conformal_optimizer::update_untangling_eps(double decrea
 
 }
 
-inline double Tetrahedral_conformal_optimizer::mips_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
+template<typename Surface_patch_index, typename Curve_index>
+inline double Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::mips_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
     double untangling_max_energy = 1.;
     double F = 0;
 
@@ -786,7 +804,8 @@ inline double Tetrahedral_conformal_optimizer::mips_untangling_energy(Eigen::Vec
 
 
 
-inline double Tetrahedral_conformal_optimizer::power_mips_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
+template<typename Surface_patch_index, typename Curve_index>
+inline double Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::power_mips_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
     double untangling_max_energy = 1.;
     double F = 0;
 
@@ -835,7 +854,8 @@ inline double Tetrahedral_conformal_optimizer::power_mips_untangling_energy(Eige
     return F;
 }
 
-inline double Tetrahedral_conformal_optimizer::regularized_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
+template<typename Surface_patch_index, typename Curve_index>
+inline double Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::regularized_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
     double untangling_max_energy = 1.;
     double F = 0;
 
@@ -895,7 +915,8 @@ inline double Tetrahedral_conformal_optimizer::regularized_untangling_energy(Eig
     return F;
 }
 
-inline double Tetrahedral_conformal_optimizer::sym_dirichlet_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
+template<typename Surface_patch_index, typename Curve_index>
+inline double Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::sym_dirichlet_untangling_energy(Eigen::VectorXd const &x, Eigen::VectorXd *grad) {
     double untangling_max_energy = 1.;
     double F = 0;
 
@@ -944,7 +965,8 @@ inline double Tetrahedral_conformal_optimizer::sym_dirichlet_untangling_energy(E
     return F;
 }
 
-inline double Tetrahedral_conformal_optimizer::laplacian_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g) {
+template<typename Surface_patch_index, typename Curve_index>
+inline double Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::laplacian_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g) {
     double F = 0;
 #pragma omp parallel for reduction(+:F)
     for (int iter_t = 0; iter_t < static_cast<int>(_tet_storage.size()); ++iter_t) {
@@ -968,13 +990,15 @@ inline double Tetrahedral_conformal_optimizer::laplacian_energy(Eigen::VectorXd 
     return F;
 }
 
-inline void Tetrahedral_conformal_optimizer::update_qis_tau(double decrease_rate) {
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::update_qis_tau(double decrease_rate) {
     double sigma = (std::max)(1.-decrease_rate, 1e-1);
     _qis_tau = _qis_tau + sigma*(1.-_qis_tau*_conformal_energy_max)/_conformal_energy_max;
 }
 
 
-inline double Tetrahedral_conformal_optimizer::qis_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g) {
+template<typename Surface_patch_index, typename Curve_index>
+inline double Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::qis_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g) {
     double F = 0;
     unsigned above_max_qual = 0;
 #pragma omp parallel for reduction(+:F, above_max_qual)
@@ -1021,13 +1045,15 @@ inline double Tetrahedral_conformal_optimizer::qis_energy(Eigen::VectorXd const 
 }
 
 
-inline bool Tetrahedral_conformal_optimizer::has_bnd_terms() const {
+template<typename Surface_patch_index, typename Curve_index>
+inline bool Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::has_bnd_terms() const {
     bool has_terms = !_bnd_poly.empty();
     bool has_query = _boundary_batch_mode ? (_boundary_batch_query != nullptr) : (_boundary_query != nullptr);
     return has_terms && has_query;
 }
 
-inline void Tetrahedral_conformal_optimizer::update_boundary_info(Eigen::VectorXd const &x, bool reset) {
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::update_boundary_info(Eigen::VectorXd const &x, bool reset) {
     if (!has_bnd_terms()) return;
 
     auto update_poly_coord = [&](unsigned t) {
@@ -1084,7 +1110,8 @@ inline void Tetrahedral_conformal_optimizer::update_boundary_info(Eigen::VectorX
     }
 }
 
-inline double Tetrahedral_conformal_optimizer::boundary_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g) {
+template<typename Surface_patch_index, typename Curve_index>
+inline double Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::boundary_energy(Eigen::VectorXd const &x, Eigen::VectorXd *g) {
     if (!has_bnd_terms()) return 0.;
     double F = 0;
     double drift = boundary_weight/(ACCEPTED_LOCAL_VARIATION_FROM_BOUNDARY*ACCEPTED_LOCAL_VARIATION_FROM_BOUNDARY);
@@ -1119,11 +1146,13 @@ inline double Tetrahedral_conformal_optimizer::boundary_energy(Eigen::VectorXd c
 }
 
 
-inline bool Tetrahedral_conformal_optimizer::has_curves_and_points_terms() const {
+template<typename Surface_patch_index, typename Curve_index>
+inline bool Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::has_curves_and_points_terms() const {
     return !_edge_data.empty() || !_point_prev_target_weight.empty();
 }
 
-inline void Tetrahedral_conformal_optimizer::update_curves_and_points_info(Eigen::VectorXd const &x, bool reset) {
+template<typename Surface_patch_index, typename Curve_index>
+inline void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::update_curves_and_points_info(Eigen::VectorXd const &x, bool reset) {
    if (!has_curves_and_points_terms()) return;
 
 
@@ -1171,7 +1200,8 @@ inline void Tetrahedral_conformal_optimizer::update_curves_and_points_info(Eigen
     }
 }
 
-inline double Tetrahedral_conformal_optimizer::curves_and_points_energies(Eigen::VectorXd const &x, Eigen::VectorXd *g) {
+template<typename Surface_patch_index, typename Curve_index>
+inline double Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::curves_and_points_energies(Eigen::VectorXd const &x, Eigen::VectorXd *g) {
     if (!has_curves_and_points_terms()) return 0.;
     double F = 0;
     double drift = boundary_weight/(ACCEPTED_LOCAL_VARIATION_FROM_BOUNDARY*ACCEPTED_LOCAL_VARIATION_FROM_BOUNDARY);
@@ -1213,7 +1243,8 @@ inline double Tetrahedral_conformal_optimizer::curves_and_points_energies(Eigen:
     return F;
 }
 
-void Tetrahedral_conformal_optimizer::run_laplacian_gradient_descent(unsigned max_number_iter) {
+template<typename Surface_patch_index, typename Curve_index>
+void Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::run_laplacian_gradient_descent(unsigned max_number_iter) {
     if (verbose) std::cout << "==== Tetrahedral_conformal_optimizer  ====" << "\n";
     if (verbose) std::cout << "----   running laplacian smoothing    ----" << "\n";
     if (verbose) std::cout << "Nb of optimization variables (vertices x3): " << _coords.size()  << std::endl;
@@ -1249,7 +1280,8 @@ void Tetrahedral_conformal_optimizer::run_laplacian_gradient_descent(unsigned ma
     if (verbose) logging.log_total_time();
 }
 
-inline bool Tetrahedral_conformal_optimizer::run_untangling(unsigned max_number_iter) {
+template<typename Surface_patch_index, typename Curve_index>
+inline bool Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::run_untangling(unsigned max_number_iter) {
     if (verbose) std::cout << "==== Tetrahedral_conformal_optimizer untangling ====" << "\n";
     if (_coords.size() == 0 || _tet_storage.empty()) {
         std::cout << "No variables to optimize." << std::endl;
@@ -1438,7 +1470,8 @@ inline bool Tetrahedral_conformal_optimizer::run_untangling(unsigned max_number_
 
 
 // TODO need update for curve and point targets
-inline bool Tetrahedral_conformal_optimizer::run_quality_maximization(unsigned max_number_iter) {
+template<typename Surface_patch_index, typename Curve_index>
+inline bool Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>::run_quality_maximization(unsigned max_number_iter) {
     if (verbose) std::cout << "==== Tetrahedral_conformal_optimizer quality maximization ====" << "\n";
     if (_coords.size() == 0 || _tet_storage.empty()) {
         if (verbose) std::cout << "No variables to optimize." << std::endl;

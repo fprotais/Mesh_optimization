@@ -75,8 +75,20 @@ public:
     /*!
 
     */
+    using Surface_patch_index = typename BoundaryMesh::Surface_patch_index;
+
+        /*!
+
+    */
+    using Curve_index = typename EdgeNetwork::Curve_index;
+
+    /*!
+
+    */
     template<typename T> using Vertex_descriptor_map = std::unordered_map<Vertex_descriptor, T>; // todo: manage to template that?
     template<typename T> using Cell_descriptor_map = std::unordered_map<Cell_descriptor, T>; // internal usage
+
+    using Tetrahedral_conformal_optimizer = Mesh_optimization_internal::Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>;
 
     /*!
         Constructor of the class, it does not perform any operation
@@ -156,7 +168,7 @@ public:
 
         \warning Must be thread safe -- it will be called in an OpenMP context. 
     */
-    using Boundary_point_query = std::function<Plane (Point_3 const &coord, unsigned surface_id, double radius)>;
+    using Boundary_point_query = std::function<Plane (Point_3 const &coord, Surface_patch_index surface_id, double radius)>;
 
     /*!
         Projection function. 
@@ -167,7 +179,7 @@ public:
 
         \warning Must be thread safe -- it will be called in an OpenMP context. 
     */
-    using Boundary_polygon_query = std::function<Plane (std::vector<Point_3> const &polygon, unsigned surface_id)>;
+    using Boundary_polygon_query = std::function<Plane (std::vector<Point_3> const &polygon, Surface_patch_index surface_id)>;
 
     /*!
         Batch projection function. Equivalent of `Boundary_point_query`. 
@@ -178,7 +190,7 @@ public:
         \param radii vector with indicator of the average edge length for each polygon
         \param[out] results vector with target plane for each polygon
     */
-    using Boundary_point_batch_query = std::function<void (std::vector<Point_3> const &coords, std::vector<unsigned> &surface_ids, std::vector<double> &radii, std::vector<Plane> &results)>;
+    using Boundary_point_batch_query = std::function<void (std::vector<Point_3> const &coords, std::vector<Surface_patch_index> &surface_ids, std::vector<double> &radii, std::vector<Plane> &results)>;
 
     /*!
         Batch projection function. Equivalent of `Boundary_polygon_query`. 
@@ -188,7 +200,7 @@ public:
         \param surface_ids vector with patch ids of each polygon as defined in `BoundaryMesh`
         \param[out] results vector with target plane for each polygon
     */
-    using Boundary_polygon_batch_query = std::function<void (std::vector<std::vector<Point_3>> const &polygons, std::vector<unsigned> &surface_id, std::vector<Plane> &results)>;
+    using Boundary_polygon_batch_query = std::function<void (std::vector<std::vector<Point_3>> const &polygons, std::vector<Surface_patch_index> &surface_id, std::vector<Plane> &results)>;
 
 
     /*!
@@ -230,7 +242,7 @@ public:
         \param radius edge length
         \return Curve_tangent to which the edge should align (usually closest tangential direction of the target geometry)
     */
-    using Curve_point_query = std::function<Curve_tangent (Point_3 const &coord, unsigned curve_id, double radius)>;
+    using Curve_point_query = std::function<Curve_tangent (Point_3 const &coord, Curve_index curve_id, double radius)>;
     
     /*!
         Projection function. 
@@ -241,7 +253,7 @@ public:
         \param curve_id id of the curve as defined in `EdgeNetwork`
         \return Curve_tangent to which the edge should align (usually closest tangential direction of the target geometry)
     */
-    using Curve_segment_query = std::function<Curve_tangent (std::array<Point_3, 2> const &edge, unsigned curve_id)>;
+    using Curve_segment_query = std::function<Curve_tangent (std::array<Point_3, 2> const &edge, Curve_index curve_id)>;
     
     /*!
         Batch projection function. Equivalent of `Curve_point_query`. 
@@ -252,7 +264,7 @@ public:
         \param radii vector with edge length of each edge
         \param[out] results vector with target curve tangent for each edge
     */
-    using Curve_point_batch_query = std::function<void (std::vector<Point_3> const &coord, std::vector<unsigned> &curve_ids, std::vector<double> &radius, std::vector<Curve_tangent> &results)>;
+    using Curve_point_batch_query = std::function<void (std::vector<Point_3> const &coord, std::vector<Curve_index> &curve_ids, std::vector<double> &radius, std::vector<Curve_tangent> &results)>;
     
     /*!
         Batch projection function. Equivalent of `Curve_segment_query`. 
@@ -262,7 +274,7 @@ public:
         \param curve_ids vector with curve ids of each edge as defined in `EdgeNetwork`
         \param[out] results vector with target curve tangent for each edge
     */
-    using Curve_segment_batch_query = std::function<void (std::vector<std::array<Point_3, 2>> const &edges, std::vector<unsigned> &curve_ids, std::vector<Curve_tangent> &results)>;
+    using Curve_segment_batch_query = std::function<void (std::vector<std::array<Point_3, 2>> const &edges, std::vector<Curve_index> &curve_ids, std::vector<Curve_tangent> &results)>;
 
 
     /*!
@@ -375,17 +387,16 @@ public: // for advanced usage. Do not touch if you do not know what you are doin
 
 public: // for advanced monitoring
 
-    using Iteration_status = Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Iteration_status;
-    using Vertex_status = Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Vertex_status;
-    using Cell_status = Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Tetrahedron_status;
+    using Iteration_status = Tetrahedral_conformal_optimizer::Iteration_status;
+    using Vertex_status = Tetrahedral_conformal_optimizer::Vertex_status;
+    using Cell_status = Tetrahedral_conformal_optimizer::Tetrahedron_status;
 
     using Callback_function = std::function<bool (Iteration_status const &status,
                                                   Vertex_descriptor_map<Vertex_status> const &vertex_data,
                                                   Cell_descriptor_map<Cell_status> const &cell_data
                                                  )>;
-    using Callback_setting = Mesh_optimization_internal::Tetrahedral_conformal_optimizer::DEBUG_CALLBACK_SETTING;
+    using Callback_setting = Tetrahedral_conformal_optimizer::DEBUG_CALLBACK_SETTING;
     void set_callback_function(Callback_function callback_function, Callback_setting setting = Callback_setting::OUTER_ITER);
-
 
 private:
     // inputs
@@ -435,7 +446,7 @@ private:
 
     std::vector<std::vector<unsigned>> _bnd_faces;
     std::vector<std::pair<unsigned, std::vector<std::array<unsigned, 2>>>> _vert_and_face_corners;
-    std::vector<unsigned> _face_surface_id;
+    std::vector<Surface_patch_index> _face_surface_id;
     QUERY_TYPE _boundary_query_type = NONE;
     Boundary_point_query _boundary_point_query = nullptr;
     Boundary_polygon_query _boundary_polygon_query = nullptr;
@@ -446,11 +457,11 @@ private:
     std::vector<std::vector<Point_3>> _boundary_batch_info_polygons;
     std::vector<Plane> _boundary_batch_planes;
 
-    void initialise_boundary_query(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &);
+    void initialise_boundary_query(Tetrahedral_conformal_optimizer &);
 
 
     std::vector<std::array<unsigned, 2>> _curve_edges;
-    std::vector<unsigned> _curve_ids;
+    std::vector<Curve_index> _curve_ids;
     QUERY_TYPE _curve_query_type = NONE;
     Curve_point_query _curve_point_query = nullptr;
     Curve_segment_query _curve_segment_query = nullptr;
@@ -461,7 +472,7 @@ private:
     std::vector<std::array<Point_3, 2>> _curve_batch_info_edges;
     std::vector<Curve_tangent> _curve_batch_tangents;
 
-    void initialise_curve_queries(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &);
+    void initialise_curve_queries(Tetrahedral_conformal_optimizer &);
 
 
     std::vector<std::tuple<unsigned, Eigen::Vector3d, double>> _point_targets;
@@ -494,7 +505,7 @@ private:
     unsigned _nb_lbfgs_iterations = 0;
     unsigned _nb_predicates_invalid_steps = 0;
 
-    void initialise_optimizer(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &);
+    void initialise_optimizer(Tetrahedral_conformal_optimizer &);
 };
 
 

@@ -38,10 +38,11 @@ namespace default_structures {
         public:
             using Face_descriptor = std::size_t;
             using Normal_3 = Eigen::Vector3d;
+            using Surface_patch_index = unsigned;
             std::size_t nb_faces() const { return 0; }
             std::vector<Face_descriptor> face_range() const { return {}; }
             std::size_t nb_face_vertices(Face_descriptor face) const { return 0; }
-            unsigned surface_id(Face_descriptor) const { return 0; }
+            Surface_patch_index patch_id(Face_descriptor) const { return 0; }
             std::vector<Vertex_descriptor> face_vertices(Face_descriptor face) const { return {}; }
     };
 
@@ -51,9 +52,10 @@ namespace default_structures {
     class Empty_edge_network {
         public:
             using Edge_descriptor = std::size_t;
+            using Curve_index = unsigned;
             std::size_t nb_edges() const { return 0; }
             std::vector<Edge_descriptor> edge_range() const { return {}; }
-            unsigned curve_id(Edge_descriptor) const { return 0; }
+            Curve_index curve_id(Edge_descriptor) const { return 0; }
             Vertex_descriptor edge_vertex(Edge_descriptor edge, unsigned i) const { return Vertex_descriptor(); }
     };
 
@@ -99,10 +101,11 @@ namespace basic_structures {
     public:
         using Face_descriptor = std::size_t;
         using Normal_3 = Eigen::Vector3d;
+        using Surface_patch_index = unsigned;
         std::size_t nb_faces() const { return _triangles.size(); }
         utils::Contiguous_unsigned_range face_range() const { return utils::Contiguous_unsigned_range{0, nb_faces()}; }
         std::size_t nb_face_vertices(Face_descriptor) const { return 3; }
-        unsigned surface_id(Face_descriptor) const { return 0; }
+        Surface_patch_index patch_id(Face_descriptor) const { return 0; }
         auto face_vertices(Face_descriptor face) const { return _triangles[face]; }
 
     public:
@@ -112,9 +115,10 @@ namespace basic_structures {
     class Simple_edge_network {
     public:
         using Edge_descriptor = std::size_t;
+        using Curve_index = unsigned;
         std::size_t nb_edges() const { return _edge_vertices.size(); }
         utils::Contiguous_unsigned_range edge_range() const { return utils::Contiguous_unsigned_range{0, nb_edges()}; }
-        unsigned curve_id(Edge_descriptor edge) const { return _id[edge]; }
+        Curve_index curve_id(Edge_descriptor edge) const { return _id[edge]; }
         std::size_t edge_vertex(Edge_descriptor edge, unsigned i) const { return _edge_vertices[edge][i]; }
     public:
         void add_edge(std::size_t v0, std::size_t v1, unsigned id = 0) {
@@ -228,10 +232,11 @@ namespace helper_structures {
         using Face_descriptor = FaceDescriptor;
         using Normal_3 = NormalType;
         using Vertex_descriptor = VertexDescriptor;
+        using Surface_patch_index = unsigned;
         std::size_t nb_faces() const { return _face_vertices.size(); }
         utils::Contiguous_unsigned_range face_range() const { return utils::Contiguous_unsigned_range{0, nb_faces()}; }
-        std::size_t face_nb_vertices(Face_descriptor face) const { return _face_vertices[face].size(); }
-        unsigned surface_id(Face_descriptor face) const { return _id[face]; }
+        std::size_t nb_face_vertices(Face_descriptor face) const { return _face_vertices[face].size(); }
+        Surface_patch_index patch_id(Face_descriptor face) const { return _id[face]; }
         auto face_vertices(Face_descriptor face) const { return _face_vertices[face]; }
 
     public:
@@ -288,6 +293,9 @@ public:
     using Point_3 = C3T3::Triangulation::Geom_traits::Point_3;
     using Weighted_point_3 = C3T3::Triangulation::Geom_traits::Weighted_point_3;
 
+    using Surface_patch_index = C3T3::Surface_patch_index;
+    using Curve_index = C3T3::Curve_index;
+
     std::size_t nb_cells() const { return c3t3.number_of_cells(); }
     std::size_t nb_faces() const { return c3t3.number_of_edges(); }
     std::size_t nb_edges() const { return c3t3.number_of_facets(); }
@@ -311,17 +319,17 @@ public:
 
     auto face_range() const { return c3t3.facets_in_complex(); }
     std::size_t nb_face_vertices(Face_descriptor face) const { return 3; }
-    unsigned surface_id(Face_descriptor) const { return 0; } // todo: find a better value
+    Surface_patch_index patch_id(Face_descriptor face) const { return c3t3.surface_patch_index(face); }
     std::vector<Vertex_descriptor> face_vertices(Face_descriptor face) const {
         std::vector<Vertex_descriptor> vertices(3);
         for (int i = 1; i < 4; ++i) {
-            vertices[static_cast<unsigned>(i)] = face.first->vertex((face.second + i)%4);
+            vertices[static_cast<unsigned>(i-1)] = face.first->vertex((face.second + i)%4);
         }
         return vertices;
     }
 
     auto edge_range() const { return c3t3.edges_in_complex(); }
-    unsigned curve_id(Edge_descriptor) const { return 0; } // todo: find a better value
+    Curve_index curve_id(Edge_descriptor edge) const { return c3t3.curve_index(edge); } 
     Vertex_descriptor edge_vertex(Edge_descriptor edge, unsigned i) const {
         assert(i < 2);
         return edge.first->vertex(i == 0 ? edge.second : edge.third);

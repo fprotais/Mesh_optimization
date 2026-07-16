@@ -15,14 +15,17 @@
 #include <CGAL/make_mesh_3.h>
 #include <CGAL/Mesh_3/C3T3_helpers.h>
 
+#include <CGAL/AABB_tree.h>
+#include <CGAL/AABB_traits_3.h>
+#include <CGAL/AABB_triangle_primitive_3.h>
+#include <CGAL/AABB_segment_primitive_3.h>
+
+#include <CGAL/Kernel/global_functions.h>
+
+#include <map>
+#include <set>
+
 #include <Mesh_optimization/Mesh_optimization.h>
-
-
-// todo:
-// - set up the right data for the C3T3
-// - do surface projection for the facets of the c3t3 with BVH queries
-// - do curve projection for the edges of the c3t3 with BVH queries
-// for the previous things, we should reproject on a copy of c3t3 to keep the given boundary
 
 // Parallel tag
 #ifdef CGAL_CONCURRENT_MESH_3
@@ -49,16 +52,112 @@ typedef CGAL::Mesh_criteria_3<Tr> Mesh_criteria;
 // C3t3
 typedef CGAL::Mesh_complex_3_in_triangulation_3<Tr> C3t3;
 
+
+#if CGAL_VERSION_NR >= CGAL_VERSION_NUMBER(6, 2, 0)
+    using Image_internal = CGAL::_image;
+    auto image_WK_FIXED = CGAL::WK_FIXED;
+    auto image_SGN_UNSIGNED = CGAL::SGN_UNSIGNED;
+// Code for CGAL 6.0 or newer
+#else
+    using Image_internal = _image;
+    auto image_WK_FIXED = WK_FIXED;
+    auto image_SGN_UNSIGNED = SGN_UNSIGNED;
+#endif
+
+
+// AABB traits for C3t3 facets and edges
+struct Facet_to_triangle_property_map
+{
+    typedef C3t3::Facet key_type;
+    typedef K::Triangle_3 value_type;
+    typedef value_type reference;
+    typedef boost::readable_property_map_tag category;
+};
+
+inline Facet_to_triangle_property_map::reference
+get(const Facet_to_triangle_property_map&, const C3t3::Facet& f)
+{
+    const Tr::Cell_handle cell = f.first;
+    const int i = f.second;
+    const K::Point_3& p0 = cell->vertex((i + 1) % 4)->point().point();
+    const K::Point_3& p1 = cell->vertex((i + 2) % 4)->point().point();
+    const K::Point_3& p2 = cell->vertex((i + 3) % 4)->point().point();
+    return K::Triangle_3(p0, p1, p2);
+}
+
+struct Facet_to_point_property_map
+{
+    typedef C3t3::Facet key_type;
+    typedef K::Point_3 value_type;
+    typedef value_type reference;
+    typedef boost::readable_property_map_tag category;
+};
+
+inline Facet_to_point_property_map::reference
+get(const Facet_to_point_property_map&, const C3t3::Facet& f)
+{
+    const Tr::Cell_handle cell = f.first;
+    const int i = f.second;
+    return cell->vertex((i + 1) % 4)->point().point();
+}
+
+struct Edge_to_segment_property_map
+{
+    typedef C3t3::Edge key_type;
+    typedef K::Segment_3 value_type;
+    typedef value_type reference;
+    typedef boost::readable_property_map_tag category;
+};
+
+inline Edge_to_segment_property_map::reference
+get(const Edge_to_segment_property_map&, const C3t3::Edge& e)
+{
+    const Tr::Cell_handle cell = e.first;
+    return K::Segment_3(cell->vertex(e.second)->point().point(), cell->vertex(e.third)->point().point());
+}
+
+struct Edge_to_point_property_map
+{
+    typedef C3t3::Edge key_type;
+    typedef K::Point_3 value_type;
+    typedef value_type reference;
+    typedef boost::readable_property_map_tag category;
+};
+
+inline Edge_to_point_property_map::reference
+get(const Edge_to_point_property_map&, const C3t3::Edge& e)
+{
+    const Tr::Cell_handle cell = e.first;
+    return cell->vertex(e.second)->point().point();
+}
+
+typedef CGAL::AABB_primitive<C3t3::Facet,
+                             Facet_to_triangle_property_map,
+                             Facet_to_point_property_map,
+                             CGAL::Tag_false,
+                             CGAL::Tag_false> Facet_primitive;
+typedef CGAL::AABB_traits_3<K, Facet_primitive> Facet_traits;
+typedef CGAL::AABB_tree<Facet_traits> Facet_tree;
+
+typedef CGAL::AABB_primitive<C3t3::Edge,
+                             Edge_to_segment_property_map,
+                             Edge_to_point_property_map,
+                             CGAL::Tag_false,
+                             CGAL::Tag_false> Edge_primitive;
+typedef CGAL::AABB_traits_3<K, Edge_primitive> Edge_traits;
+typedef CGAL::AABB_tree<Edge_traits> Edge_tree;
+
 // To avoid verbose function and named parameters call
 namespace params = CGAL::parameters;
+
 
 // image of type 'unsigned char' initialised with '0'
 CGAL::Image_3 create_cgal_image(const std::size_t& xdim, const std::size_t& ydim, const std::size_t& zdim,
                                 double vx = 1.0, double vy = 1.0, double vz = 1.0)
 {
-    CGAL::_image* im = _createImage(xdim, ydim, zdim, 1,
+    Image_internal* im = _createImage(xdim, ydim, zdim, 1,
                                     vx, vy, vz, 1,
-                                    CGAL::WK_FIXED, CGAL::SGN_UNSIGNED);
+                                    image_WK_FIXED, image_SGN_UNSIGNED);
     std::fill_n(static_cast<unsigned char*>(im->data), xdim*ydim*zdim, 0);
     return CGAL::Image_3(im);
 }
@@ -69,7 +168,7 @@ void add_rectangle_in_image(const K::Point_3& rectangle_min, // [0..1]^3
                             CGAL::Image_3 &image)
 {
     using CGAL::IMAGEIO::static_evaluate;
-    CGAL::_image* im = image.image();
+    Image_internal* im = image.image();
     const std::size_t min_x = rectangle_min.x() * im->xdim;
     const std::size_t min_y = rectangle_min.y() * im->ydim;
     const std::size_t min_z = rectangle_min.z() * im->zdim;
@@ -166,10 +265,67 @@ int main(int argc, char* argv[])
     C3t3 c3t3_deformed(static_cast<const C3t3>(c3t3));
     deform_c3t3_smooth_fold(c3t3_deformed, 3.141592635 * 0.5, 100);
 
-    // Output
+    C3t3 c3t3_deformed_ref(static_cast<const C3t3>(c3t3));
+    deform_c3t3_smooth_fold(c3t3_deformed_ref, 3.141592635 * 0.5, 100);
     CGAL::dump_c3t3(c3t3_deformed, "c3t3_deformed");
 
+    
+    // AABB trees of the surface and curve features of the c3t3
+    std::map<C3t3::Surface_patch_index, std::vector<C3t3::Facet>> facets_by_patch;
+    for (auto f : c3t3_deformed_ref.facets_in_complex())
+    {
+        facets_by_patch[c3t3_deformed_ref.surface_patch_index(f)].push_back(f);
+    }
+    
+    std::map<C3t3::Curve_index, std::vector<C3t3::Edge>> edges_by_curve;
+    for (auto e : c3t3_deformed_ref.edges_in_complex())
+    {
+        edges_by_curve[c3t3_deformed_ref.curve_index(e)].push_back(e);
+    }
+
+    std::map<C3t3::Surface_patch_index, Facet_tree> facet_trees;
+    for (auto& kv : facets_by_patch)
+    {
+        facet_trees.try_emplace(kv.first, kv.second.begin(), kv.second.end());
+    }
+
+    std::map<C3t3::Curve_index, Edge_tree> edge_trees;
+    for (auto& kv : edges_by_curve)
+    {
+        edge_trees.try_emplace(kv.first, kv.second.begin(), kv.second.end());
+    }
+
+    std::cout << "Built " << facet_trees.size() << " facet AABB trees and " << edge_trees.size() << " edge AABB trees." << std::endl;
+
+
+    // Smoothing
+
     Mesh_optimization::C3T3_optimizer optimizer(c3t3_deformed);
+    for (auto c : c3t3.vertices_in_complex())
+    {
+        optimizer.set_vertex_Lock(c, true);
+    }
+
+    optimizer.set_boundary_query([&](K::Point_3 const &pt, C3t3::Surface_patch_index id, double radius) -> std::tuple<K::Point_3, K::Vector_3, double> {
+        auto res = facet_trees.at(id).closest_point_and_primitive(pt);
+        K::Point_3 closest_point = res.first;
+        const auto triangle = c3t3_deformed_ref.triangulation().triangle(res.second);
+        K::Vector_3 normal = CGAL::unit_normal(triangle.vertex(0), triangle.vertex(1), triangle.vertex(2));
+        return std::make_tuple(closest_point, normal, 1.);
+    });
+
+    optimizer.set_curves_query([&](K::Point_3 const &pt, C3t3::Curve_index id, double radius) -> std::tuple<K::Point_3, K::Vector_3, double> {
+        auto res = edge_trees.at(id).closest_point_and_primitive(pt);
+        K::Point_3 closest_point = res.first;
+        const auto segment = c3t3_deformed_ref.triangulation().segment(res.second);
+        K::Vector_3 direction = (segment.target() - segment.source());
+        if (direction.squared_length() > 1e-8)
+        {
+            direction /= CGAL::sqrt(direction.squared_length());
+        }
+        return std::make_tuple(closest_point, direction, 1.);
+    });
+
     optimizer.set_verbose();
     optimizer.set_max_number_of_iteration(100);
     optimizer.run();

@@ -331,7 +331,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
             if (!res.second) (*res.first).second.push_back(location_pair);
         }
         _bnd_faces.push_back(currFace);
-        _face_surface_id.push_back(_boundary.surface_id(face));
+        _face_surface_id.push_back(_boundary.patch_id(face));
     }
     // not ordered, do a sort? then I lose memory alignment? check if becomes bottleneck
     _vert_and_face_corners.assign(vert2faces.begin(), vert2faces.end());
@@ -449,7 +449,7 @@ bool Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::run_c
 }
 
 template<typename TetrahedralMesh, typename BoundaryMesh, typename EdgeNetwork>
-void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initialise_boundary_query(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &optimizer) {
+void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initialise_boundary_query(Tetrahedral_conformal_optimizer &optimizer) {
     switch (_boundary_query_type) {
     case NONE:
         optimizer.set_boundary_with_singular_query(
@@ -461,7 +461,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
         break;
     case POINT_QUERY:
         {
-            Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Boundary_query boundary_query = [&](std::vector<Eigen::Vector3d> const &coords, unsigned surface_id) {
+            typename Tetrahedral_conformal_optimizer::Boundary_query boundary_query = [&](std::vector<Eigen::Vector3d> const &coords, Surface_patch_index surface_id) {
                 Eigen::Vector3d center = Eigen::Vector3d::Zero();
                 for (auto const &coord : coords) {
                     center += coord;
@@ -477,7 +477,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
                 Eigen::Vector3d proj = convert_to_inner(user_point);
                 Eigen::Vector3d normal = convert_to_eigen(user_normal);
                 normal.normalize();
-                return Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Plane{ proj, normal, weight };
+                return typename Tetrahedral_conformal_optimizer::Plane{ proj, normal, weight };
             };
             optimizer.set_boundary_with_singular_query(
                 _bnd_faces,
@@ -489,7 +489,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
         break;
     case ELEMENT_QUERY:
         {
-            Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Boundary_query boundary_query = [&](std::vector<Eigen::Vector3d> const &coords, unsigned surface_id) {
+            typename Tetrahedral_conformal_optimizer::Boundary_query boundary_query = [&](std::vector<Eigen::Vector3d> const &coords, Surface_patch_index surface_id) {
                 std::vector<Point_3> polygon(coords.size());
                 for (unsigned i = 0; i < coords.size(); ++i) {
                     polygon[i] = convert_to_user(coords[i]);
@@ -498,7 +498,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
                 Eigen::Vector3d proj = convert_to_inner(user_point);
                 Eigen::Vector3d normal = convert_to_eigen(user_normal);
                 normal.normalize();
-                return Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Plane{ proj, normal, weight };
+                return typename Tetrahedral_conformal_optimizer::Plane{ proj, normal, weight };
             };
             optimizer.set_boundary_with_singular_query(
                 _bnd_faces,
@@ -510,7 +510,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
         break;
     case BATCH_POINT_QUERY:
         {
-            Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Boundary_batch_query boundary_query = [&](std::vector<std::vector<Eigen::Vector3d>> const &coords, std::vector<unsigned> surface_ids, std::vector<Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Plane> &results) {
+            typename Tetrahedral_conformal_optimizer::Boundary_batch_query boundary_query = [&](std::vector<std::vector<Eigen::Vector3d>> const &coords, std::vector<Surface_patch_index> surface_ids, std::vector<typename Tetrahedral_conformal_optimizer::Plane> &results) {
                 if (coords.size() != _boundary_batch_info_points.size()) {
                     _boundary_batch_info_points.resize(coords.size());
                     _boundary_batch_info_radii.resize(coords.size());
@@ -555,7 +555,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
         break;
     case BATCH_ELEMENT_QUERY:
         {
-            Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Boundary_batch_query boundary_query = [&](std::vector<std::vector<Eigen::Vector3d>> const &coords, std::vector<unsigned> surface_ids, std::vector<Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Plane> &results) {
+            typename Tetrahedral_conformal_optimizer::Boundary_batch_query boundary_query = [&](std::vector<std::vector<Eigen::Vector3d>> const &coords, std::vector<Surface_patch_index> surface_ids, std::vector<typename Tetrahedral_conformal_optimizer::Plane> &results) {
                 if (coords.size() != _boundary_batch_info_polygons.size()) {
                     _boundary_batch_info_polygons.reserve(coords.size());
                     for (unsigned i = 0; i < coords.size(); ++i) {
@@ -593,20 +593,20 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
 }
 
 template<typename TetrahedralMesh, typename BoundaryMesh, typename EdgeNetwork>
-void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initialise_curve_queries(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &optimizer) {
+void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initialise_curve_queries(Tetrahedral_conformal_optimizer &optimizer) {
     switch (_curve_query_type) {
     case NONE:
         break;
     case POINT_QUERY:
         {
-            Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Curve_query curve_query = [&](std::array<Eigen::Vector3d, 2> const &coords, unsigned curve_id) {
+            typename Tetrahedral_conformal_optimizer::Curve_query curve_query = [&](std::array<Eigen::Vector3d, 2> const &coords, Curve_index curve_id) {
                 Eigen::Vector3d center = 0.5*(coords[0] + coords[1]);
                 double radius = (coords[1] - coords[0]).norm() / _scale;
                 auto [user_point, user_tangent, weight] =  _curve_point_query(convert_to_user(center), curve_id, radius);
                 Eigen::Vector3d proj = convert_to_inner(user_point);
                 Eigen::Vector3d tangent = convert_to_eigen(user_tangent);
                 tangent.normalize();
-                return Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Curve_tangent{ proj, tangent, weight };
+                return typename Tetrahedral_conformal_optimizer::Curve_tangent{ proj, tangent, weight };
             };
             optimizer.set_curve_network_with_singular_query(
                 _curve_edges,
@@ -617,13 +617,13 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
         break;
     case ELEMENT_QUERY:
         {
-            Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Curve_query curve_query = [&](std::array<Eigen::Vector3d, 2> const &coords, unsigned curve_id) {
+            typename Tetrahedral_conformal_optimizer::Curve_query curve_query = [&](std::array<Eigen::Vector3d, 2> const &coords, Curve_index curve_id) {
                 std::array<Point_3, 2> edge = { convert_to_user(coords[0]),  convert_to_user(coords[1])};
                 auto [user_point, user_tangent, weight] =  _curve_segment_query(edge, curve_id);
                 Eigen::Vector3d proj = convert_to_inner(user_point);
                 Eigen::Vector3d tangent = convert_to_eigen(user_tangent);
                 tangent.normalize();
-                return Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Curve_tangent{ proj, tangent, weight };
+                return typename Tetrahedral_conformal_optimizer::Curve_tangent{ proj, tangent, weight };
             };
             optimizer.set_curve_network_with_singular_query(
                 _curve_edges,
@@ -634,7 +634,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
         break;
     case BATCH_POINT_QUERY:
         {
-            Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Curve_batch_query curve_query = [&](std::vector<std::array<Eigen::Vector3d, 2>> const &edges, std::vector<unsigned> curve_ids, std::vector<Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Curve_tangent> &results) {
+            typename Tetrahedral_conformal_optimizer::Curve_batch_query curve_query = [&](std::vector<std::array<Eigen::Vector3d, 2>> const &edges, std::vector<Curve_index> curve_ids, std::vector<typename Tetrahedral_conformal_optimizer::Curve_tangent> &results) {
                 if (edges.size() != _curve_batch_info_points.size()) {
                     _curve_batch_info_points.resize(edges.size());
                     _curve_batch_info_radii.resize(edges.size());
@@ -652,7 +652,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
                     Eigen::Vector3d proj = convert_to_inner(user_point);
                     Eigen::Vector3d tangent = convert_to_eigen(user_tangent);
                     tangent.normalize();
-                    results[e] = { proj, tangent, weight };
+                    results[e] = typename Tetrahedral_conformal_optimizer::Curve_tangent{ proj, tangent, weight };
                 }
             };
             optimizer.set_curve_network_with_batch_query(
@@ -664,7 +664,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
         break;
     case BATCH_ELEMENT_QUERY:
         {
-            Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Curve_batch_query curve_query = [&](std::vector<std::array<Eigen::Vector3d, 2>> const &edges, std::vector<unsigned> curve_ids, std::vector<Mesh_optimization_internal::Tetrahedral_conformal_optimizer::Curve_tangent> &results) {
+            typename Tetrahedral_conformal_optimizer::Curve_batch_query curve_query = [&](std::vector<std::array<Eigen::Vector3d, 2>> const &edges, std::vector<Curve_index> curve_ids, std::vector<typename Tetrahedral_conformal_optimizer::Curve_tangent> &results) {
                 if (edges.size() != _curve_batch_info_edges.size()) {
                     _curve_batch_info_edges.resize(edges.size());
                     _curve_batch_tangents.resize(edges.size());
@@ -694,7 +694,7 @@ void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initi
 }
 
 template<typename TetrahedralMesh, typename BoundaryMesh, typename EdgeNetwork>
-void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initialise_optimizer(Mesh_optimization_internal::Tetrahedral_conformal_optimizer &optimizer) {
+void Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::initialise_optimizer(Tetrahedral_conformal_optimizer &optimizer) {
     initialise_boundary_query(optimizer);
     initialise_curve_queries(optimizer);
 
@@ -737,7 +737,7 @@ std::pair<unsigned, unsigned> Mesh_conformal_optimizer<TetrahedralMesh, Boundary
     check_refs();
     create_compress_sorted_data();
     rescale_geometry();
-    Mesh_optimization_internal::Tetrahedral_conformal_optimizer optimizer(_compressed_coords, _compressed_locks, _tetrahedra, _tetrahedron_refs, _vert2tet_corner);
+    Tetrahedral_conformal_optimizer optimizer(_compressed_coords, _compressed_locks, _tetrahedra, _tetrahedron_refs, _vert2tet_corner);
 
     auto determinants = optimizer.get_determinants();
     auto exact_checks = optimizer.get_predicate_is_positive();
@@ -763,7 +763,7 @@ bool Mesh_conformal_optimizer<TetrahedralMesh, BoundaryMesh, EdgeNetwork>::run()
     check_refs();
     create_compress_sorted_data();
     rescale_geometry();
-    Mesh_optimization_internal::Tetrahedral_conformal_optimizer optimizer(_compressed_coords, _compressed_locks, _tetrahedra, _tetrahedron_refs, _vert2tet_corner);
+    Tetrahedral_conformal_optimizer optimizer(_compressed_coords, _compressed_locks, _tetrahedra, _tetrahedron_refs, _vert2tet_corner);
 
     initialise_optimizer(optimizer);
     bool result = false;

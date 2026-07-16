@@ -116,11 +116,12 @@ public:
     using Face_descriptor = unsigned;
     using Vertex_descriptor = Triangulation::Vertex_handle;
     using Normal_3 =  K::Vector_3;
+    using Surface_patch_index = unsigned;
     std::size_t nb_faces() const { return faces.size(); }
     auto face_range() const {
         return Mesh_optimization::utils::Contiguous_unsigned_range{0, faces.size()};
     }
-    unsigned surface_id(Face_descriptor) const { return 0; }
+    unsigned patch_id(Face_descriptor) const { return 0; }
     std::size_t nb_face_vertices(Face_descriptor) const { return 3; }
     auto face_vertices(Face_descriptor face) const {
         return faces[face];

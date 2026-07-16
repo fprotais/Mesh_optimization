@@ -20,6 +20,10 @@ Descriptor used to access a edge information
 */
 using Edge_descriptor = unspecified_type;
 
+/*!
+Index associated with an edge to identify the curve it belongs to. This is used to query the curve information from the user.
+*/
+using Curve_index = unspecified_type;
 
 /// @}
 
@@ -40,7 +44,7 @@ unspecified_type edge_range() const;
 /*!
 Returns an identifier (curve id, segment id, ...) related to the given edge.
 */
-unsigned curve_id(Edge_descriptor edge) const;
+Curve_index curve_id(Edge_descriptor edge) const;
 
 /*!
 Return the ith vertex of the edge (max 2). Vertex_descriptor as given in `MeshDataStructure`. 
