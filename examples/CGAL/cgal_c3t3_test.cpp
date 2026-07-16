@@ -252,7 +252,7 @@ int main(int argc, char* argv[])
         params::facet_size = sizing_default,
         params::facet_distance = sizing_default / 10,
         params::facet_topology = CGAL::FACET_VERTICES_ON_SAME_SURFACE_PATCH,
-        params::cell_radius_edge_ratio = 0,
+        params::cell_radius_edge_ratio = 1.5,
         params::cell_size = 0
     );
     C3t3 c3t3 = CGAL::make_mesh_3<C3t3>(domain, criteria,
