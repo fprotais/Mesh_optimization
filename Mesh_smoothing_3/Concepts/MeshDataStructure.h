@@ -4,7 +4,7 @@
 
 The concept `MeshDataStructure` describes the way the tetrahedral mesh will be accessed and modified.
 
-\sa `CGAL::Mesh_optimization::Mesh_conformal_optimizer`
+\sa `CGAL::Mesh_optimization::Mesh_smoother`
 
 */
 class MeshDataStructure {

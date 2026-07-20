@@ -20,8 +20,7 @@
 #include <CGAL/IO/File_medit.h>
 
 
-#include <Mesh_optimization/mesh_representations.h>
-#include <Mesh_optimization/Mesh_conformal_optimizer.h>
+#include <Mesh_smoothing_3/Mesh_smoothing_3.h>
 
 #include <iostream>
 #include <string>
@@ -94,7 +93,7 @@ public:
         }
         return vertices;
     }
-    std::array<Point_3, 4> cell_reference_shape(Cell_descriptor) const { return Mesh_optimization::Shapes::VTK_TETRAHEDRON<Point_3>(); }
+    std::array<Point_3, 4> cell_reference_shape(Cell_descriptor) const { return Mesh_smoothing_3::Shapes::VTK_TETRAHEDRON<Point_3>(); }
 public:
     Tetrahedral_mesh_wrapper(Triangulation &tetmesh_, std::set<int> regions)
     : tetmesh(tetmesh_)
@@ -119,7 +118,7 @@ public:
     using Surface_patch_index = unsigned;
     std::size_t nb_faces() const { return faces.size(); }
     auto face_range() const {
-        return Mesh_optimization::utils::Contiguous_unsigned_range{0, faces.size()};
+        return Mesh_smoothing_3::utils::Contiguous_unsigned_range{0, faces.size()};
     }
     unsigned patch_id(Face_descriptor) const { return 0; }
     std::size_t nb_face_vertices(Face_descriptor) const { return 3; }
@@ -265,22 +264,22 @@ int main(int argc, char** argv)
     Tetrahedral_mesh_wrapper mesh_wrapper(tr, {1,2});
     Triangle_boundary_wrapper boundary_wrapper {boundary_faces};
 
-    Mesh_optimization::Mesh_conformal_optimizer optimizer(mesh_wrapper, boundary_wrapper);
-    optimizer.set_verbose();
+    Mesh_smoothing_3::Mesh_smoother smoother(mesh_wrapper, boundary_wrapper);
+    smoother.set_verbose();
 
-    optimizer.set_locked_vertices(boundary_vertices);
-    optimizer.run();
+    smoother.set_locked_vertices(boundary_vertices);
+    smoother.run();
 
     std::ofstream all_after_smoothed("offset_wrapper.mesh");
     CGAL::IO::write_MEDIT(all_after_smoothed, tr, CGAL::parameters::all_cells(false));
 
-    optimizer.clear_locks();
-    optimizer.set_vertices_dim_locks(locked);
-    optimizer.set_boundary_query(boundary_query);
-    optimizer.set_max_number_of_iteration(100);
-    optimizer.run();
-    optimizer.clear_locks();
-    optimizer.run();
+    smoother.clear_locks();
+    smoother.set_vertices_dim_locks(locked);
+    smoother.set_boundary_query(boundary_query);
+    smoother.set_max_number_of_iteration(100);
+    smoother.run();
+    smoother.clear_locks();
+    smoother.run();
 
 
     std::ofstream inside_after_smoothed("offset_ours.mesh");

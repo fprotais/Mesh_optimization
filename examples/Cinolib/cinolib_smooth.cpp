@@ -1,10 +1,10 @@
-#include <Mesh_optimization/Mesh_conformal_optimizer.h>
+#include <Mesh_smoothing_3/Mesh_smoothing_3.h>
 #include <cinolib/meshes/meshes.h>
 #include <cinolib/octree.h>
 
-using Mesh_optimization::utils::Contiguous_unsigned_range;
+using Mesh_smoothing_3::utils::Contiguous_unsigned_range;
 
-class Mesh_wrapper : public Mesh_optimization::helper_structures::Mixed_element_mesh<int, int, cinolib::vec3d, Contiguous_unsigned_range> {
+class Mesh_wrapper : public Mesh_smoothing_3::helper_structures::Mixed_element_mesh<int, int, cinolib::vec3d, Contiguous_unsigned_range> {
 public:
     std::size_t nb_vertices() const override { return mesh.num_verts(); }
 
@@ -63,10 +63,10 @@ public:
     cinolib::Polyhedralmesh<> &mesh;
     cinolib::Polyhedralmesh<> const * ref_mesh;
 
-    Mesh_optimization::Shapes::VTK_TETRAHEDRON<cinolib::vec3d> tet_ref;
-    Mesh_optimization::Shapes::VTK_HEXAHEDRON<cinolib::vec3d> hex_ref;
-    Mesh_optimization::Shapes::VTK_PYRAMID<cinolib::vec3d> py_ref;
-    Mesh_optimization::Shapes::VTK_WEDGE<cinolib::vec3d> we_ref;
+    Mesh_smoothing_3::Shapes::VTK_TETRAHEDRON<cinolib::vec3d> tet_ref;
+    Mesh_smoothing_3::Shapes::VTK_HEXAHEDRON<cinolib::vec3d> hex_ref;
+    Mesh_smoothing_3::Shapes::VTK_PYRAMID<cinolib::vec3d> py_ref;
+    Mesh_smoothing_3::Shapes::VTK_WEDGE<cinolib::vec3d> we_ref;
 };
 
 void compute_octree_from_input_surface(cinolib::Trimesh<> const &target_mesh, cinolib::Octree &octree, std::vector<cinolib::vec3d> &face_normal) {
@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
     const std::string filename = (argc > 1) ? argv[1] : "../data/fandisk_kenshi_hexmesh.mesh";
 
     cinolib::Polyhedralmesh<> mesh(filename.c_str());
-    Mesh_optimization::helper_structures::Polygonal_boundary<unsigned, unsigned, cinolib::vec3d> boundary;
+    Mesh_smoothing_3::helper_structures::Polygonal_boundary<unsigned, unsigned, cinolib::vec3d> boundary;
     for(uint fid=0; fid<mesh.num_faces(); ++fid) {
         if (mesh.face_is_on_srf(fid)) {
             auto face_vertices = mesh.face_verts_id(fid);
@@ -154,13 +154,13 @@ int main(int argc, char** argv) {
     Mesh_wrapper mesh_wrapper(mesh, nullptr); // replacing nullptr by &reference will use it as a reference;
     mesh_wrapper.set_orientation(false, false, false, false); // beware of the orientation of your input elements!
 
-    Mesh_optimization::Mesh_conformal_optimizer optimizer(mesh_wrapper, boundary);
+    Mesh_smoothing_3::Mesh_smoother smoother(mesh_wrapper, boundary);
 
-    optimizer.set_boundary_query(query);
+    smoother.set_boundary_query(query);
 
-    optimizer.set_verbose();
-    optimizer.set_max_number_of_iteration(100);
-    optimizer.run();
+    smoother.set_verbose();
+    smoother.set_max_number_of_iteration(100);
+    smoother.run();
 
     mesh.save("output.mesh");
 

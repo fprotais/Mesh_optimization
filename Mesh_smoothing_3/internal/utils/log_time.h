@@ -3,7 +3,7 @@
 #include <iostream>
 #include "colorized_text.h"
 
-namespace Mesh_optimization_internal {
+namespace Mesh_smoothing_3_internal {
 
 class Time_log {
 public:

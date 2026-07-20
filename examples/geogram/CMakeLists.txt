@@ -10,7 +10,7 @@ FetchContent_MakeAvailable(geogram)
 
 add_executable(geogram_smooth geogram_smooth.cpp)
 add_executable(geogram_smooth_custom geogram_smooth_custom.cpp)
-target_link_libraries(geogram_smooth PRIVATE Mesh_optimization geogram)
-target_link_libraries(geogram_smooth_custom PRIVATE Mesh_optimization geogram)
+target_link_libraries(geogram_smooth PRIVATE Mesh_smoothing_3 geogram)
+target_link_libraries(geogram_smooth_custom PRIVATE Mesh_smoothing_3 geogram)
 
 

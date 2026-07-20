@@ -4,7 +4,7 @@
 
 The concept `SurfaceDataStructure` describes the way the surface mesh will be accessed.
 
-\sa `CGAL::Mesh_optimization::Mesh_conformal_optimizer`
+\sa `CGAL::Mesh_optimization::Mesh_smoother`
 \sa `MeshDataStructure`
 
 */

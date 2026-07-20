@@ -25,7 +25,7 @@
 #include <map>
 #include <set>
 
-#include <Mesh_optimization/Mesh_optimization.h>
+#include <Mesh_smoothing_3/Mesh_smoothing_3.h>
 
 // Parallel tag
 #ifdef CGAL_CONCURRENT_MESH_3
@@ -300,13 +300,13 @@ int main(int argc, char* argv[])
 
     // Smoothing
 
-    Mesh_optimization::C3T3_optimizer optimizer(c3t3_deformed);
+    Mesh_smoothing_3::C3t3_smoother smoother(c3t3_deformed);
     for (auto c : c3t3.vertices_in_complex())
     {
-        optimizer.set_vertex_Lock(c, true);
+        smoother.set_vertex_lock(c, true);
     }
 
-    optimizer.set_boundary_query([&](K::Point_3 const &pt, C3t3::Surface_patch_index id, double radius) -> std::tuple<K::Point_3, K::Vector_3, double> {
+    smoother.set_boundary_query([&](K::Point_3 const &pt, C3t3::Surface_patch_index id, double radius) -> std::tuple<K::Point_3, K::Vector_3, double> {
         auto res = facet_trees.at(id).closest_point_and_primitive(pt);
         K::Point_3 closest_point = res.first;
         const auto triangle = c3t3_deformed_ref.triangulation().triangle(res.second);
@@ -314,7 +314,7 @@ int main(int argc, char* argv[])
         return std::make_tuple(closest_point, normal, 1.);
     });
 
-    optimizer.set_curves_query([&](K::Point_3 const &pt, C3t3::Curve_index id, double radius) -> std::tuple<K::Point_3, K::Vector_3, double> {
+    smoother.set_curves_query([&](K::Point_3 const &pt, C3t3::Curve_index id, double radius) -> std::tuple<K::Point_3, K::Vector_3, double> {
         auto res = edge_trees.at(id).closest_point_and_primitive(pt);
         K::Point_3 closest_point = res.first;
         const auto segment = c3t3_deformed_ref.triangulation().segment(res.second);
@@ -326,9 +326,9 @@ int main(int argc, char* argv[])
         return std::make_tuple(closest_point, direction, 1.);
     });
 
-    optimizer.set_verbose();
-    optimizer.set_max_number_of_iteration(100);
-    optimizer.run();
+    smoother.set_verbose();
+    smoother.set_max_number_of_iteration(100);
+    smoother.run();
 
     CGAL::dump_c3t3(c3t3_deformed, "c3t3_smoothed");
 

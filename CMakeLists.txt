@@ -17,12 +17,12 @@ find_package(Eigen3 3.3.0 QUIET REQUIRED)
 
 
 # Export a header-only interface target so FetchContent users can link to it.
-add_library(Mesh_optimization INTERFACE)
-target_include_directories(Mesh_optimization
+add_library(Mesh_smoothing_3 INTERFACE)
+target_include_directories(Mesh_smoothing_3
     INTERFACE
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
-target_link_libraries(Mesh_optimization INTERFACE Eigen3::Eigen)
+target_link_libraries(Mesh_smoothing_3 INTERFACE Eigen3::Eigen)
 
 ## Use OpenMP when available. 
 option(USE_OPENMP "Enable OpenMP support" ON)
@@ -36,7 +36,7 @@ if (USE_OPENMP)
       set_target_properties(OpenMP::OpenMP_CXX PROPERTIES
                             INTERFACE_COMPILE_OPTIONS "/openmp:llvm")
     endif()
-    target_link_libraries(Mesh_optimization INTERFACE OpenMP::OpenMP_CXX)
+    target_link_libraries(Mesh_smoothing_3 INTERFACE OpenMP::OpenMP_CXX)
   else()
     message(STATUS "OpenMP requested but not found.")
   endif()

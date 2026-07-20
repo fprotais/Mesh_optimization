@@ -7,7 +7,7 @@
 
 #include <iostream>
 
-namespace Mesh_optimization {
+namespace Mesh_smoothing_3 {
 
 namespace default_structures {
 
@@ -143,7 +143,7 @@ namespace helper_structures {
     class Mixed_element_mesh {
     public:
         // you redefine these in your derived class and then you need to call assemble() before using the structure
-        using Shape = Mesh_optimization::Shapes::Base_element_shape_reference<Point3>;
+        using Shape = Mesh_smoothing_3::Shapes::Base_element_shape_reference<Point3>;
 
         virtual std::size_t nb_vertices() const = 0;
 
@@ -282,19 +282,19 @@ class Triangulation_3_wrapper {
     Triangulation_3 &tr;
 };
 
-template <typename C3T3>
-class C3T3_wrapper {
+template <typename C3t3>
+class C3t3_wrapper {
 public:
-    using Cell_descriptor = C3T3::Cell_handle;
-    using Vertex_descriptor = C3T3::Vertex_handle;
-    using Face_descriptor = C3T3::Facet;
-    using Edge_descriptor = C3T3::Edge;
-    using Normal_3 = C3T3::Triangulation::Geom_traits::Vector_3;
-    using Point_3 = C3T3::Triangulation::Geom_traits::Point_3;
-    using Weighted_point_3 = C3T3::Triangulation::Geom_traits::Weighted_point_3;
+    using Cell_descriptor = C3t3::Cell_handle;
+    using Vertex_descriptor = C3t3::Vertex_handle;
+    using Face_descriptor = C3t3::Facet;
+    using Edge_descriptor = C3t3::Edge;
+    using Normal_3 = C3t3::Triangulation::Geom_traits::Vector_3;
+    using Point_3 = C3t3::Triangulation::Geom_traits::Point_3;
+    using Weighted_point_3 = C3t3::Triangulation::Geom_traits::Weighted_point_3;
 
-    using Surface_patch_index = C3T3::Surface_patch_index;
-    using Curve_index = C3T3::Curve_index;
+    using Surface_patch_index = C3t3::Surface_patch_index;
+    using Curve_index = C3t3::Curve_index;
 
     std::size_t nb_cells() const { return c3t3.number_of_cells(); }
     std::size_t nb_faces() const { return c3t3.number_of_edges(); }
@@ -335,7 +335,7 @@ public:
         return edge.first->vertex(i == 0 ? edge.second : edge.third);
     }
 
-    C3T3 &c3t3;
+    C3t3 &c3t3;
 };
 
 }

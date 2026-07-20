@@ -2,7 +2,7 @@
 
 #include <functional>
 
-namespace Mesh_optimization_internal {
+namespace Mesh_smoothing_3_internal {
 
 #include "LBFGS-Lite/include/lbfgs.hpp" // todo: probably not good inside namespace. modify the code itself? Without namespace?
 

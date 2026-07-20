@@ -3,7 +3,7 @@
 #include <array>
 
 
-namespace Mesh_optimization_internal {
+namespace Mesh_smoothing_3_internal {
 
 
 namespace exact_predicates {

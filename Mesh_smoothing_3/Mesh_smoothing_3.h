@@ -4,10 +4,10 @@
 #include <functional>
 #include <Eigen/Eigen>
 #include "mesh_representations.h"
-#include "internal/Tetrahedral_conformal_optimizer.h"
+#include "internal/Tetrahedral_mesh_smoother.h"
 
 
-namespace Mesh_optimization {
+namespace Mesh_smoothing_3 {
 
 namespace Parameters {
     /*!
@@ -27,10 +27,10 @@ namespace Parameters {
 /*!
 \ingroup PkgMeshOptimization
 
-The class `Mesh_conformal_optimizer` provides an interface to optimize a tetrahedral mesh with a conformal energy, 
+The class `Mesh_smoother` provides an interface to optimize a tetrahedral mesh with an energy, 
 while allowing the user to specify soft-constraints on the boundary and along a curve network. 
 This class is designed for linking with various mesh representations.
-For usage with CGAL common mesh representations, refer to `Triangulation_3_optimizer` and `C3T3_optimizer`.
+For usage with CGAL common mesh representations, refer to `C3t3_smoother`.
 
 \tparam TetrahedralMesh encodes the volumetric mesh and must be a model of `MeshDataStructure`.
 
@@ -41,8 +41,7 @@ that will be used to define surface constraints on `TetrahedralMesh`. It must be
 that will be used to add curve constraints on `TetrahedralMesh`. It must be a model of `PolylinesDataStructure`.
 
 
-\sa `CGAL::Mesh_optimization::Triangulation_3_optimizer`
-\sa `CGAL::Mesh_optimization::C3T3_optimizer`
+\sa `CGAL::Mesh_smoothing_3::C3t3_smoother`
 
 */
 template<
@@ -50,7 +49,7 @@ template<
     typename BoundaryMesh = default_structures::Empty_boundary<typename TetrahedralMesh::Vertex_descriptor>,
     typename EdgeNetwork = default_structures::Empty_edge_network<typename TetrahedralMesh::Vertex_descriptor>
 >
-class Mesh_conformal_optimizer {
+class Mesh_smoother {
 public:
     /*!
 
@@ -88,12 +87,12 @@ public:
     template<typename T> using Vertex_descriptor_map = std::unordered_map<Vertex_descriptor, T>; // todo: manage to template that?
     template<typename T> using Cell_descriptor_map = std::unordered_map<Cell_descriptor, T>; // internal usage
 
-    using Tetrahedral_conformal_optimizer = Mesh_optimization_internal::Tetrahedral_conformal_optimizer<Surface_patch_index, Curve_index>;
+    using Tetrahedral_mesh_smoother = Mesh_smoothing_3_internal::Tetrahedral_mesh_smoother<Surface_patch_index, Curve_index>;
 
     /*!
         Constructor of the class, it does not perform any operation
     */
-    Mesh_conformal_optimizer(TetrahedralMesh &mesh, BoundaryMesh const &boundary = BoundaryMesh(), EdgeNetwork const &edge_network = EdgeNetwork());
+    Mesh_smoother(TetrahedralMesh &mesh, BoundaryMesh const &boundary = BoundaryMesh(), EdgeNetwork const &edge_network = EdgeNetwork());
 
     /*!
         Locks (or unlock) all vertices contained in the input BoundaryMesh. 
@@ -108,7 +107,7 @@ public:
     void set_verbose(bool verbose = true);
     
     /*!
-        Max number of high level iterations done by the optimizer. Each iteration can be seen as equivalent to a Newton step. 
+        Max number of high level iterations done by the smoother. Each iteration can be seen as equivalent to a Newton step. 
         Untangling may require a high number of iterations to converge (100), simple mesh improvement will usually require less (from 1 to 10). 
         Default is 1000. 
     */
@@ -120,7 +119,7 @@ public:
     /*!
         Hard-constraining a certain vertex to its current coordinates
     */
-    void set_vertex_Lock(Vertex_descriptor vertex, bool locked = true);
+    void set_vertex_lock(Vertex_descriptor vertex, bool locked = true);
 
     /*!
         Hard-constraining only 1 dimension for the given vertex
@@ -140,7 +139,7 @@ public:
     template <typename Container>
     void set_locked_vertices(Container const &vertices) {
         for (Vertex_descriptor vertex : vertices) {
-            set_vertex_Lock(vertex, true);
+            set_vertex_lock(vertex, true);
         }
     }
 
@@ -387,15 +386,15 @@ public: // for advanced usage. Do not touch if you do not know what you are doin
 
 public: // for advanced monitoring
 
-    using Iteration_status = Tetrahedral_conformal_optimizer::Iteration_status;
-    using Vertex_status = Tetrahedral_conformal_optimizer::Vertex_status;
-    using Cell_status = Tetrahedral_conformal_optimizer::Tetrahedron_status;
+    using Iteration_status = Tetrahedral_mesh_smoother::Iteration_status;
+    using Vertex_status = Tetrahedral_mesh_smoother::Vertex_status;
+    using Cell_status = Tetrahedral_mesh_smoother::Tetrahedron_status;
 
     using Callback_function = std::function<bool (Iteration_status const &status,
                                                   Vertex_descriptor_map<Vertex_status> const &vertex_data,
                                                   Cell_descriptor_map<Cell_status> const &cell_data
                                                  )>;
-    using Callback_setting = Tetrahedral_conformal_optimizer::DEBUG_CALLBACK_SETTING;
+    using Callback_setting = Tetrahedral_mesh_smoother::DEBUG_CALLBACK_SETTING;
     void set_callback_function(Callback_function callback_function, Callback_setting setting = Callback_setting::OUTER_ITER);
 
 private:
@@ -457,7 +456,7 @@ private:
     std::vector<std::vector<Point_3>> _boundary_batch_info_polygons;
     std::vector<Plane> _boundary_batch_planes;
 
-    void initialise_boundary_query(Tetrahedral_conformal_optimizer &);
+    void initialise_boundary_query(Tetrahedral_mesh_smoother &);
 
 
     std::vector<std::array<unsigned, 2>> _curve_edges;
@@ -472,7 +471,7 @@ private:
     std::vector<std::array<Point_3, 2>> _curve_batch_info_edges;
     std::vector<Curve_tangent> _curve_batch_tangents;
 
-    void initialise_curve_queries(Tetrahedral_conformal_optimizer &);
+    void initialise_curve_queries(Tetrahedral_mesh_smoother &);
 
 
     std::vector<std::tuple<unsigned, Eigen::Vector3d, double>> _point_targets;
@@ -505,13 +504,30 @@ private:
     unsigned _nb_lbfgs_iterations = 0;
     unsigned _nb_predicates_invalid_steps = 0;
 
-    void initialise_optimizer(Tetrahedral_conformal_optimizer &);
+    void initialise_smoother(Tetrahedral_mesh_smoother &);
 };
 
 
+using cgal_types::C3t3_wrapper; 
 
-}
+template<
+    typename C3T3
+>
+class C3t3_smoother : public Mesh_smoother <C3t3_wrapper<C3T3>, C3t3_wrapper<C3T3>, C3t3_wrapper<C3T3>> {
+private:
+    C3t3_wrapper<C3T3> mesh_wrapper;
+
+public:
+    C3t3_smoother(C3T3 &c3t3)
+    : mesh_wrapper{c3t3}
+    , Mesh_smoother<C3t3_wrapper<C3T3>, C3t3_wrapper<C3T3>, C3t3_wrapper<C3T3>>(mesh_wrapper, mesh_wrapper, mesh_wrapper)
+    {}
+
+};
+
+
+} // namespace Mesh_smoothing_3
 
 
 
-#include "internal/Mesh_conformal_optimizer_impl.hpp"
+#include "internal/Mesh_smoothing_3_impl.hpp"

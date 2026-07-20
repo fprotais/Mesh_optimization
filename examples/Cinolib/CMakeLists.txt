@@ -11,4 +11,4 @@ find_package(cinolib REQUIRED)
 
 
 add_executable(cinolib_smooth cinolib_smooth.cpp)
-target_link_libraries(cinolib_smooth PRIVATE Mesh_optimization cinolib)
+target_link_libraries(cinolib_smooth PRIVATE Mesh_smoothing_3 cinolib)

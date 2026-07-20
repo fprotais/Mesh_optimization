@@ -1,7 +1,7 @@
 #pragma once
 #include <Eigen/Eigen>
 
-namespace Mesh_optimization_internal {
+namespace Mesh_smoothing_3_internal {
 
 namespace Math_functions {
     inline Eigen::Matrix<double,1,3> sub_line_vector(Eigen::VectorXd const &x, unsigned i) {

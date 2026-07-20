@@ -1,13 +1,13 @@
 #include <cstdlib>
 #include <random>
 
-#include <Mesh_optimization/Mesh_conformal_optimizer.h>
+#include <Mesh_smoothing_3/Mesh_smoothing_3.h>
 
 #include <igl/readMESH.h>
 #include <igl/writeMESH.h>
 #include <iostream>
 
-using Mesh_optimization::utils::Contiguous_unsigned_range;
+using Mesh_smoothing_3::utils::Contiguous_unsigned_range;
 
 class Tetrahedral_mesh_wrapper {
 public:
@@ -77,13 +77,13 @@ int main(int argc, char *argv[])
 
     Tetrahedral_mesh_wrapper mesh_wrapper {V, ref_V, T};
 
-    Mesh_optimization::Mesh_conformal_optimizer optimizer(mesh_wrapper);
-    optimizer.set_verbose();
-    optimizer.set_locked_boundary(false);
+    Mesh_smoothing_3::Mesh_smoother smoother(mesh_wrapper);
+    smoother.set_verbose();
+    smoother.set_locked_boundary(false);
 
-    optimizer.set_vertex_target_positions(handles);
+    smoother.set_vertex_target_positions(handles);
 
-    bool res = optimizer.run();
+    bool res = smoother.run();
 
     std::cerr << "Smoothing result = " << (res ? "SUCCESS" : "FAILURE") << std::endl;
     igl::writeMESH("handle_output.mesh", V, T, F);

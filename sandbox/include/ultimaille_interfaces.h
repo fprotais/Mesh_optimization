@@ -2,13 +2,13 @@
 #include <set>
 #include <map>
 #include <ultimaille/all.h>
-#include <Mesh_optimization/mesh_representations.h>
+#include <Mesh_smoothing_3/Mesh_smoothing_3.h>
 #include "ultimaille_mesh_utils.h"
 
 
 namespace UM_extension {
-    using Mesh_optimization::utils::Contiguous_unsigned_range;
-    using Mesh_optimization::helper_structures::Mixed_element_mesh;
+    using Mesh_smoothing_3::utils::Contiguous_unsigned_range;
+    using Mesh_smoothing_3::helper_structures::Mixed_element_mesh;
 
 
 
@@ -66,7 +66,7 @@ namespace UM_extension {
         }
         UM::Tetrahedra &tetmesh;
         UM::Tetrahedra const *refmesh;
-        Mesh_optimization::Shapes::VTK_TETRAHEDRON<UM::vec3> ref_shape;
+        Mesh_smoothing_3::Shapes::VTK_TETRAHEDRON<UM::vec3> ref_shape;
 
         std::array<Point_3, 4> get_cell_ref(Cell_descriptor cell) const {
             return {refmesh->points[refmesh->vert(cell, 0)], refmesh->points[refmesh->vert(cell, 1)], refmesh->points[refmesh->vert(cell, 2)], refmesh->points[refmesh->vert(cell, 3)]};
@@ -134,7 +134,7 @@ namespace UM_extension {
             hex_ref.inverse = inverse_numbering;
         }
         UM::Hexahedra &hexmesh;
-        Mesh_optimization::Shapes::GEOGRAM_HEXAHEDRON<UM::vec3> hex_ref;
+        Mesh_smoothing_3::Shapes::GEOGRAM_HEXAHEDRON<UM::vec3> hex_ref;
     };
 
     class Quad_boundary_wrapper {
@@ -222,13 +222,13 @@ namespace UM_extension {
         UM::Wedges const &wm;
         UM::Hexahedra const &hm;
 
-        Mesh_optimization::Shapes::VTK_TETRAHEDRON<UM::vec3> tet_ref;
-        Mesh_optimization::Shapes::VTK_PYRAMID<UM::vec3> py_ref;
-        Mesh_optimization::Shapes::VTK_WEDGE<UM::vec3> we_ref;
-        Mesh_optimization::Shapes::GEOGRAM_HEXAHEDRON<UM::vec3> hex_ref;
+        Mesh_smoothing_3::Shapes::VTK_TETRAHEDRON<UM::vec3> tet_ref;
+        Mesh_smoothing_3::Shapes::VTK_PYRAMID<UM::vec3> py_ref;
+        Mesh_smoothing_3::Shapes::VTK_WEDGE<UM::vec3> we_ref;
+        Mesh_smoothing_3::Shapes::GEOGRAM_HEXAHEDRON<UM::vec3> hex_ref;
     };
 
-    using Polygonal_boundary_support = Mesh_optimization::helper_structures::Polygonal_boundary<unsigned, unsigned, UM::vec3>;
+    using Polygonal_boundary_support = Mesh_smoothing_3::helper_structures::Polygonal_boundary<unsigned, unsigned, UM::vec3>;
 
 
    inline void generate_boundary(

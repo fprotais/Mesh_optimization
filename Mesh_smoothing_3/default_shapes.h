@@ -4,8 +4,10 @@
 #include <array>
 #include <Eigen/Eigen>
 
-namespace Mesh_optimization {
+namespace Mesh_smoothing_3 {
+
 namespace Shapes {
+    
     template < 
         typename Point3  = Eigen::Vector3d
     >

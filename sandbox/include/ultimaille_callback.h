@@ -1,13 +1,13 @@
 #pragma once
 #include <ultimaille/all.h>
-#include <Mesh_optimization/Mesh_conformal_optimizer.h>
+#include <Mesh_smoothing_3/Mesh_smoothing_3.h>
 #include "ultimaille_interfaces.h"
 #include "ultimaille_mesh_utils.h"
 
 
 namespace UM_extension {
-    using Optimizer = Mesh_optimization::Mesh_conformal_optimizer<UM_extension::Tetrahedral_mesh_wrapper, UM_extension::Triangle_boundary_wrapper>;
-    using Callback_setting = Optimizer::Callback_setting;
+    using Smoother = Mesh_smoothing_3::Mesh_smoother<UM_extension::Tetrahedral_mesh_wrapper, UM_extension::Triangle_boundary_wrapper>;
+    using Callback_setting = Smoother::Callback_setting;
 
     template <typename MeshType>
     class Callback_structure {
@@ -45,14 +45,14 @@ namespace UM_extension {
         std::string mesh_name = "mesh";
 
         std::function<bool(
-            Optimizer::Iteration_status const &,
-            Optimizer::Vertex_descriptor_map<Optimizer::Vertex_status> const &,
-            Optimizer::Cell_descriptor_map<Optimizer::Cell_status> const &
+            Smoother::Iteration_status const &,
+            Smoother::Vertex_descriptor_map<Smoother::Vertex_status> const &,
+            Smoother::Cell_descriptor_map<Smoother::Cell_status> const &
         )> get_callable_function() {
             return [&](
-                Optimizer::Iteration_status const &status,
-                Optimizer::Vertex_descriptor_map<Optimizer::Vertex_status> const &vertex_data,
-                Optimizer::Cell_descriptor_map<Optimizer::Cell_status> const &cell_data
+                Smoother::Iteration_status const &status,
+                Smoother::Vertex_descriptor_map<Smoother::Vertex_status> const &vertex_data,
+                Smoother::Cell_descriptor_map<Smoother::Cell_status> const &cell_data
             ) {
                 return run(status, vertex_data, cell_data);
             };
@@ -107,9 +107,9 @@ namespace UM_extension {
         }
 
         inline bool run(
-            Optimizer::Iteration_status const &status,
-            Optimizer::Vertex_descriptor_map<Optimizer::Vertex_status> const &vertex_data,
-            Optimizer::Cell_descriptor_map<Optimizer::Cell_status> const &cell_data
+            Smoother::Iteration_status const &status,
+            Smoother::Vertex_descriptor_map<Smoother::Vertex_status> const &vertex_data,
+            Smoother::Cell_descriptor_map<Smoother::Cell_status> const &cell_data
         ) {
             if (status.is_in_lbfgs()) {
                 if (status.lbfgs_status.iter > bfgs_max_display_iter)   return false;

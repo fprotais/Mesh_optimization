@@ -3,7 +3,7 @@
 #include <set>
 #include <map>
 
-#include <Mesh_optimization/Mesh_conformal_optimizer.h>
+#include <Mesh_smoothing_3/Mesh_smoothing_3.h>
 
 #include "include/ultimaille_interfaces.h"
 #include "include/ultimaille_curve_query.h"
@@ -49,17 +49,17 @@ int main(int argc, char** argv) {
 
     mixed_mesh.save("input", ".mesh");
 
-    Mesh_optimization::Mesh_conformal_optimizer optimizer(mixed_mesh.get_mixed_mesh(true, false, false, false), mixed_mesh.get_polygonal_boundary(), curve_wrapper);
+    Mesh_smoothing_3::Mesh_smoother smoother(mixed_mesh.get_mixed_mesh(true, false, false, false), mixed_mesh.get_polygonal_boundary(), curve_wrapper);
 
-    optimizer.set_boundary_query(projector.get_callable_custom_polygon_query());
-    optimizer.set_curves_query([&](UM::vec3 const &pt, unsigned curve_id, double) -> std::tuple<UM::vec3, UM::vec3, double> {
+    smoother.set_boundary_query(projector.get_callable_custom_polygon_query());
+    smoother.set_curves_query([&](UM::vec3 const &pt, unsigned curve_id, double) -> std::tuple<UM::vec3, UM::vec3, double> {
         auto [p, n] = curve_projector.proj(pt, curve_id);
         return {p, n, 1.};
     });
 
-    optimizer.set_verbose();
-    optimizer.set_max_number_of_iteration(100);
-    optimizer.run();
+    smoother.set_verbose();
+    smoother.set_max_number_of_iteration(100);
+    smoother.run();
 
     mixed_mesh.save("output", ".mesh");
 

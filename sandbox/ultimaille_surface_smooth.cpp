@@ -3,14 +3,14 @@
 #include <set>
 #include <map>
 
-#include <Mesh_optimization/Mesh_conformal_optimizer.h>
+#include <Mesh_smoothing_3/Mesh_smoothing_3.h>
 
 #include "include/ultimaille_interfaces.h"
 #include "include/ultimaille_boundary_query.h"
 #include "include/ultimaille_mesh_utils.h"
 #include <ultimaille/all.h>
 
-class Surface_mesh_wrapper : public Mesh_optimization::helper_structures::Mixed_element_mesh<int, int, UM::vec3, UM_extension::Contiguous_unsigned_range> {
+class Surface_mesh_wrapper : public Mesh_smoothing_3::helper_structures::Mixed_element_mesh<int, int, UM::vec3, UM_extension::Contiguous_unsigned_range> {
 public:
     std::size_t nb_vertices() const override { return mesh.nverts() + scaffold_points.size(); }
 
@@ -86,10 +86,10 @@ public:
 
     std::vector<UM::vec3> scaffold_points;
 
-    Mesh_optimization::Shapes::VTK_TETRAHEDRON<UM::vec3> tet_ref;
-    Mesh_optimization::Shapes::VTK_TETRAHEDRON<UM::vec3> inv_tet_ref;
-    Mesh_optimization::Shapes::VTK_PYRAMID<UM::vec3> py_ref;
-    Mesh_optimization::Shapes::VTK_PYRAMID<UM::vec3> inv_py_ref;
+    Mesh_smoothing_3::Shapes::VTK_TETRAHEDRON<UM::vec3> tet_ref;
+    Mesh_smoothing_3::Shapes::VTK_TETRAHEDRON<UM::vec3> inv_tet_ref;
+    Mesh_smoothing_3::Shapes::VTK_PYRAMID<UM::vec3> py_ref;
+    Mesh_smoothing_3::Shapes::VTK_PYRAMID<UM::vec3> inv_py_ref;
 
 };
 
@@ -293,11 +293,11 @@ int main(int argc, char** argv) {
     UM::write_by_extension(identifier + "_scaffold_p.mesh", scaffold_pyramids);
 
 
-    Mesh_optimization::Mesh_conformal_optimizer optimizer(mesh_wrapper, boundary_wrapper, curves_wrapper);
-    optimizer.set_boundary_query(surf_proj.get_callable_custom_point_query());
+    Mesh_smoothing_3::Mesh_smoother smoother(mesh_wrapper, boundary_wrapper, curves_wrapper);
+    smoother.set_boundary_query(surf_proj.get_callable_custom_point_query());
 
     if (is_open_mesh) {
-        optimizer.set_curves_query([&](UM::vec3 pt, unsigned e, double) {
+        smoother.set_curves_query([&](UM::vec3 pt, unsigned e, double) {
             auto [proj, normal] = target_curves.proj(pt, e);
             return std::tuple<UM::vec3, UM::vec3, double>{proj, normal, 1.};
         });
@@ -305,20 +305,20 @@ int main(int argc, char** argv) {
 
     if (is_2d_case) {
         for (int i = 0; i < mesh.nverts(); ++i) {
-            optimizer.set_vertex_dim_lock(i, 2);
+            smoother.set_vertex_dim_lock(i, 2);
         }        
     }
     else {
         for (unsigned i = mesh.nverts(); i < mesh_wrapper.nb_vertices(); ++i) {
-            optimizer.set_vertex_Lock(i);
+            smoother.set_vertex_lock(i);
         }
     }
 
-    optimizer.set_verbose();
+    smoother.set_verbose();
 
 
     if (is_2d_case) {
-        optimizer.run();
+        smoother.run();
         mesh_wrapper.get_scaffold_meshes(scaffold_tet, scaffold_pyramids);
         UM::write_by_extension(identifier + "_output.mesh", mesh);
         UM::write_by_extension(identifier + "_output_scaffold_t.mesh", scaffold_tet);
@@ -330,7 +330,7 @@ int main(int argc, char** argv) {
 
     for (unsigned i = 1; i < 6; ++i) {
         mesh_wrapper.update_scaffold();
-        optimizer.run();
+        smoother.run();
         mesh_wrapper.get_scaffold_meshes(scaffold_tet, scaffold_pyramids);
 
         UM::write_by_extension(identifier + "_iter_"+std::to_string(i)+"_scaffold_t.mesh", scaffold_tet);

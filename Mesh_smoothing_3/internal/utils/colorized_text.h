@@ -8,7 +8,7 @@
 #include <Windows.h>
 #endif
 
-namespace Mesh_optimization_internal {
+namespace Mesh_smoothing_3_internal {
 
 #if defined WIN32 || defined _WIN64
 enum class ConsoleTextColor : std::uint8_t

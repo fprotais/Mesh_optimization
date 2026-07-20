@@ -4,7 +4,7 @@
 
 The concept `PolylinesDataStructure` describes the way the curves on the mesh will be accessed.
 
-\sa `CGAL::Mesh_optimization::Mesh_conformal_optimizer`
+\sa `CGAL::Mesh_optimization::Mesh_smoother`
 \sa `MeshDataStructure`
 \sa `SurfaceDataStructure`
 

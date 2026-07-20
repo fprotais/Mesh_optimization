@@ -74,7 +74,7 @@ In both cases, the result will be saved as `output.mesh`.
 The code can include exact predicates to strictly enforce the orientation of elements. This is disabled by default to support starting from invalid meshes. 
 It can simply be enabled using the following instruction: 
 ```C++
-optimizer.set_predicates_mode(Mesh_optimization::Parameters::STRONG_ENFORCEMENT); 
+smoother.set_predicates_mode(Mesh_optimization::Parameters::STRONG_ENFORCEMENT); 
 ```
 
 

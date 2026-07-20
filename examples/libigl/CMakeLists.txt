@@ -6,5 +6,5 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(libigl)
 
 add_executable(libigl_handle_deformation libigl_handle_deformation.cpp)
-target_link_libraries(libigl_handle_deformation PRIVATE Mesh_optimization igl::core)
+target_link_libraries(libigl_handle_deformation PRIVATE Mesh_smoothing_3 igl::core)
 
