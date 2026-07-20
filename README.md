@@ -8,7 +8,7 @@ This is the reference implementation of the optimization approach presented in
 
 > ⚠️ This code is intended to be included in [CGAL](https://github.com/cgal/cgal) in the near future. As such, it may undergo noticeable changes in its structure. This repository will always remain as a link to the CGAL version, and hopefully provide python bindings.
 
-The core of the code (`Mesh_optimization` directory) is header only and templated, hence fully agnostic to mesh representation. The target is to deploy a toolbox that can be used with any application with limited linking, relying solely on [Eigen3](https://libeigen.gitlab.io) as an external tool. We accessed the functionalities of the solver through the following popular geometry processing libraries, which **entirely** take care of input/output, mesh storage and handling:
+The core of the code (`Mesh_smoothing_3` directory) is header only and templated, hence fully agnostic to mesh representation. The target is to deploy a toolbox that can be used with any application with limited linking, relying solely on [Eigen3](https://libeigen.gitlab.io) as an external tool. We accessed the functionalities of the solver through the following popular geometry processing libraries, which **entirely** take care of input/output, mesh storage and handling:
 * [Geogram](https://github.com/BrunoLevy/geogram)
 * [Cinolib](https://github.com/mlivesu/cinolib)
 * [LibIGL](https://github.com/libigl/libigl)
@@ -74,7 +74,7 @@ In both cases, the result will be saved as `output.mesh`.
 The code can include exact predicates to strictly enforce the orientation of elements. This is disabled by default to support starting from invalid meshes. 
 It can simply be enabled using the following instruction: 
 ```C++
-smoother.set_predicates_mode(Mesh_optimization::Parameters::STRONG_ENFORCEMENT); 
+smoother.set_predicates_mode(Mesh_smoothing_3::Parameters::STRONG_ENFORCEMENT); 
 ```
 
 

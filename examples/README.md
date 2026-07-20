@@ -37,7 +37,7 @@ This executable highlight the alignment to all type of queries at the same time:
 The final result will be saved as `output.mesh`. As mentioned in the paper, for this specific case, we use $\lambda_\text{strong} = 10$, see
 
 ```C++
-    smoother.set_boundary_weight(Mesh_optimization::Parameters::STRONG);
+    smoother.set_boundary_weight(Mesh_smoothing_3::Parameters::STRONG);
 ```
 Your application may need a different parameter. 
 

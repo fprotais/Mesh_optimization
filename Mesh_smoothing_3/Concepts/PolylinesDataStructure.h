@@ -1,10 +1,10 @@
 /*!
-\ingroup PkgMeshOptimizationConcepts
+\ingroup PkgMeshSmoothing3Concepts
 \cgalConcept
 
 The concept `PolylinesDataStructure` describes the way the curves on the mesh will be accessed.
 
-\sa `CGAL::Mesh_optimization::Mesh_smoother`
+\sa `CGAL::Mesh_smoothing_3::Mesh_smoother`
 \sa `MeshDataStructure`
 \sa `SurfaceDataStructure`
 
